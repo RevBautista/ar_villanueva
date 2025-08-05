@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>AR con click para colocar modelo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0" />
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        .a-enter-vr {
+            display: none !important;
+        }
+        a-scene {
+            width: 100vw;
+            height: 100vh;
+        }
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            background-color: rgba(0,0,0,0.5);
+            padding: 10px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions">Toca la pantalla para colocar el modelo 3D</div>
+    
+    <a-scene
+        embedded
+        arjs="sourceType: webcam; 
+              debugUIEnabled: false;
+              detectionMode: mono_and_matrix; 
+              matrixCodeType: 3x3;
+              maxDetectionRate: 30;
+              cameraParametersUrl: https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/data/camera_para.dat"
+        renderer="logarithmicDepthBuffer: true;
+                 precision: medium;
+                 antialias: true;
+                 alpha: true"
+        vr-mode-ui="enabled: false">
+        
+        <!-- Carga del modelo -->
+        <a-assets>
+            <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
+        </a-assets>
+
+        <!-- Cámara con controles optimizados para móvil -->
+        <a-entity 
+            camera 
+            id="camera" 
+            look-controls="pointerLockEnabled: false; touchEnabled: true"
+            wasd-controls="enabled: false">
+        </a-entity>
+    </a-scene>
+
+    <script>
+        // Esperar a que la escena esté cargada
+        document.querySelector('a-scene').addEventListener('loaded', function() {
+            // Ocultar instrucciones después de 5 segundos
+            setTimeout(function() {
+                document.getElementById('instructions').style.display = 'none';
+            }, 5000);
+        });
+
+        // Cuando haces click en la pantalla
+        document.body.addEventListener('click', function(evt) {
+            // Evitar múltiples toques rápidos
+            if (Date.now() - (window.lastModelPlacement || 0) < 500) return;
+            window.lastModelPlacement = Date.now();
+            
+            const sceneEl = document.querySelector('a-scene');
+            const camera = document.querySelector('[camera]');
+            
+            // Eliminar modelos anteriores si es necesario
+            const oldModels = document.querySelectorAll('[gltf-model]');
+            oldModels.forEach(model => sceneEl.removeChild(model));
+            
+            // Obtener posición y rotación de la cámara
+            const camPos = camera.getAttribute('position');
+            const camRot = camera.getAttribute('rotation');
+            
+            // Crear entidad del modelo
+            const entity = document.createElement('a-entity');
+            entity.setAttribute('gltf-model', '#modelGLB');
+            
+            // Ajustar escala según dispositivo
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            const scale = isAndroid ? '0.4 0.4 0.4' : '0.5 0.5 0.5';
+            entity.setAttribute('scale', scale);
+            
+            // Calcular posición frente a la cámara (distancia mayor en Android)
+            const angle = camRot.y * (Math.PI / 180);
+            const distance = isAndroid ? 2.0 : 1.5;
+            const x = camPos.x - Math.sin(angle) * distance;
+            const z = camPos.z - Math.cos(angle) * distance;
+            
+            // Ajustar altura según dispositivo
+            const yOffset = isAndroid ? -0.3 : -0.5;
+            
+            entity.setAttribute('position', { 
+                x: x, 
+                y: camPos.y + yOffset, 
+                z: z 
+            });
+            
+            // Rotar el modelo para que mire hacia la cámara
+            entity.setAttribute('rotation', {
+                x: 0,
+                y: camRot.y + (isAndroid ? 180 : 0), // Ajuste adicional para Android
+                z: 0
+            });
+            
+            // Añadir animación para suavizar la aparición
+            entity.setAttribute('animation', {
+                property: 'scale',
+                from: '0.1 0.1 0.1',
+                to: scale,
+                dur: 500
+            });
+            
+            // Añadir sombra para mejor visualización
+            entity.setAttribute('shadow', {
+                receive: false,
+                cast: true
+            });
+            
+            sceneEl.appendChild(entity);
+            
+            // Mostrar feedback visual
+            showPlacementFeedback(x, camPos.y + yOffset, z);
+        });
+
+        // Mostrar feedback cuando se coloca el modelo
+        function showPlacementFeedback(x, y, z) {
+            const feedback = document.createElement('a-entity');
+            feedback.setAttribute('position', {x: x, y: y, z: z});
+            feedback.setAttribute('geometry', 'primitive: ring; radiusInner: 0.1; radiusOuter: 0.2');
+            feedback.setAttribute('material', 'color: #4CC3D9; shader: flat');
+            feedback.setAttribute('animation', {
+                property: 'scale',
+                from: '1 1 1',
+                to: '0 0 0',
+                dur: 500,
+                easing: 'easeOutQuad'
+            });
+            
+            // Auto-eliminarse después de la animación
+            feedback.addEventListener('animationcomplete', function() {
+                document.querySelector('a-scene').removeChild(feedback);
+            });
+            
+            document.querySelector('a-scene').appendChild(feedback);
+        }
+    </script>
+</body>
+</html>
