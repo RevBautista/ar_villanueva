@@ -1,55 +1,206 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <title>AR con click para colocar modelo</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<head>
+    <meta charset="UTF-8">
+    <title>AR para Android - Modelo 3D</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
-  </head>
-  <body style="margin: 0; overflow: hidden;">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            touch-action: none;
+        }
+        .a-enter-vr {
+            display: none !important;
+        }
+        a-scene {
+            width: 100vw;
+            height: 100vh;
+        }
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            background-color: rgba(0,0,0,0.7);
+            padding: 15px;
+            z-index: 1000;
+            font-size: 18px;
+            border-radius: 10px;
+            margin: 0 20px;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 20px;
+            z-index: 1001;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Cargando experiencia AR...</div>
+    <div id="instructions">Toca en cualquier lugar para colocar el modelo</div>
+    
     <a-scene
-      embedded
-      arjs="sourceType: webcam; debugUIEnabled: false;"
-      renderer="logarithmicDepthBuffer: true;"
-    >
-      <!-- Carga del modelo -->
-      <a-assets>
-        <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
-      </a-assets>
+        embedded
+        arjs="sourceType: webcam;
+              debugUIEnabled: false;
+              detectionMode: mono_and_matrix;
+              matrixCodeType: 3x3;
+              maxDetectionRate: 60;
+              cameraParametersUrl: https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/data/camera_para.dat"
+        renderer="logarithmicDepthBuffer: true;
+                 precision: high;
+                 antialias: true;
+                 alpha: true"
+        vr-mode-ui="enabled: false">
+        
+        <a-assets>
+            <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
+        </a-assets>
 
-      <!-- Cámara -->
-      <a-entity camera id="camera" look-controls></a-entity>
+        <a-entity 
+            camera
+            id="camera"
+            look-controls="pointerLockEnabled: false; touchEnabled: true"
+            wasd-controls="enabled: false">
+        </a-entity>
     </a-scene>
 
     <script>
-      // Cuando haces click en la pantalla
-      document.body.addEventListener('click', function () {
-        const sceneEl = document.querySelector('a-scene');
-        const camera = document.querySelector('[camera]');
+        // Variables de configuración para Android
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        const config = {
+            scale: isAndroid ? 0.25 : 0.35,       // Escala más pequeña para Android
+            distance: isAndroid ? 1.8 : 1.5,      // Mayor distancia para Android
+            yOffset: isAndroid ? -0.4 : -0.3,     // Ajuste de altura
+            rotationOffset: isAndroid ? 180 : 0    // Corrección de rotación
+        };
 
-        // Obtiene la posición actual de la cámara
-        const camPos = camera.getAttribute('position');
-        const camRot = camera.getAttribute('rotation');
+        // Ocultar carga cuando la escena esté lista
+        document.querySelector('a-scene').addEventListener('loaded', function() {
+            document.getElementById('loading').style.display = 'none';
+            
+            // Ocultar instrucciones después de 7 segundos
+            setTimeout(function() {
+                const instructions = document.getElementById('instructions');
+                if (instructions) instructions.style.opacity = '0.5';
+            }, 7000);
+        });
 
-        // Crea la entidad del modelo
-        const entity = document.createElement('a-entity');
-        entity.setAttribute('gltf-model', '#modelGLB');
-        entity.setAttribute('scale', '0.5 0.5 0.5');
+        // Colocar modelo al hacer click
+        document.body.addEventListener('click', function(evt) {
+            // Evitar múltiples toques rápidos
+            if (Date.now() - (window.lastModelPlacement || 0) < 1000) return;
+            window.lastModelPlacement = Date.now();
+            
+            const sceneEl = document.querySelector('a-scene');
+            const camera = document.querySelector('[camera]');
+            
+            // Eliminar modelo anterior si existe
+            const oldModel = document.querySelector('[gltf-model]');
+            if (oldModel) sceneEl.removeChild(oldModel);
+            
+            // Obtener posición y rotación de la cámara
+            const camPos = camera.getAttribute('position');
+            const camRot = camera.getAttribute('rotation');
+            
+            // Calcular posición frente a la cámara
+            const angle = camRot.y * (Math.PI / 180);
+            const x = camPos.x - Math.sin(angle) * config.distance;
+            const z = camPos.z - Math.cos(angle) * config.distance;
+            
+            // Crear y configurar el modelo
+            const model = document.createElement('a-entity');
+            model.setAttribute('gltf-model', '#modelGLB');
+            model.setAttribute('scale', {
+                x: config.scale,
+                y: config.scale,
+                z: config.scale
+            });
+            model.setAttribute('position', {
+                x: x,
+                y: camPos.y + config.yOffset,
+                z: z
+            });
+            model.setAttribute('rotation', {
+                x: 0,
+                y: camRot.y + config.rotationOffset,
+                z: 0
+            });
+            
+            // Animación de aparición
+            model.setAttribute('animation', {
+                property: 'scale',
+                from: '0.01 0.01 0.01',
+                to: `${config.scale} ${config.scale} ${config.scale}`,
+                dur: 800,
+                easing: 'easeOutElastic'
+            });
+            
+            // Sombra para mejor visualización
+            model.setAttribute('shadow', {
+                cast: true,
+                receive: false
+            });
+            
+            // Añadir a la escena
+            sceneEl.appendChild(model);
+            
+            // Feedback visual
+            showPlacementFeedback(x, camPos.y + config.yOffset, z);
+            
+            // Ocultar instrucciones al colocar el modelo
+            document.getElementById('instructions').style.display = 'none';
+        });
 
-        // Coloca el modelo frente a la cámara (a 1 metro)
-        const angle = camRot.y * (Math.PI / 180);
-        const distance = 1;
-        const x = camPos.x - Math.sin(angle) * distance;
-        const z = camPos.z - Math.cos(angle) * distance;
-
-        entity.setAttribute('position', { x: x, y: camPos.y - 0.5, z: z });
-
-        // Agrega el modelo a la escena
-        sceneEl.appendChild(entity);
-
-        console.log('✅ Modelo colocado en:', entity.getAttribute('position'));
-      });
+        // Mostrar efecto al colocar el modelo
+        function showPlacementFeedback(x, y, z) {
+            const scene = document.querySelector('a-scene');
+            
+            // Crear efecto de ondas concéntricas
+            const ripple = document.createElement('a-entity');
+            ripple.setAttribute('position', {x: x, y: y, z: z});
+            ripple.setAttribute('geometry', {
+                primitive: 'ring',
+                radiusInner: 0.05,
+                radiusOuter: 0.1
+            });
+            ripple.setAttribute('material', {
+                color: '#00FFFF',
+                shader: 'flat',
+                opacity: 0.8
+            });
+            ripple.setAttribute('animation', {
+                property: 'scale',
+                from: '1 1 1',
+                to: '3 3 3',
+                dur: 500,
+                easing: 'easeOutQuad'
+            });
+            ripple.setAttribute('animation__opacity', {
+                property: 'material.opacity',
+                from: 0.8,
+                to: 0,
+                dur: 500,
+                easing: 'easeOutQuad'
+            });
+            
+            // Auto-eliminarse después de la animación
+            ripple.addEventListener('animationcomplete', function() {
+                scene.removeChild(ripple);
+            });
+            
+            scene.appendChild(ripple);
+        }
     </script>
-  </body>
+</body>
 </html>
