@@ -1,54 +1,63 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <title>AR con modelo GLB</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<head>
+  <meta charset="UTF-8" />
+  <title>AR sobre marcador</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+    renderer="logarithmicDepthBuffer: true;"
+  >
+    <!-- Carga del modelo -->
+    <a-assets>
+      <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
+    </a-assets>
 
-    <!-- Librerías A-Frame y AR.js -->
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
-  </head>
+    <!-- Marcador Hiro -->
+    <a-marker preset="hiro">
+      
+      <!-- Suelo virtual -->
+      <a-plane 
+        position="0 0 0" 
+        rotation="-90 0 0" 
+        width="1.5" 
+        height="1.5" 
+        color="#999" 
+        opacity="0.3">
+      </a-plane>
 
-  <body style="margin: 0; overflow: hidden;">
-    <a-scene
-      embedded
-      vr-mode-ui="enabled: false"
-      arjs="sourceType: webcam; debugUIEnabled: true;"
-      renderer="logarithmicDepthBuffer: true;"
-    >
-      <!-- Carga de recursos -->
-      <a-assets>
-        <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
-      </a-assets>
+      <!-- Modelo cargado -->
+      <a-entity 
+        id="modelo"
+        gltf-model="#modelGLB"
+        position="0 0.05 0"
+        rotation="0 180 0"
+        scale="0.2 0.2 0.2">
+      </a-entity>
 
-      <!-- Marcador tipo Hiro -->
-      <a-marker preset="hiro">
-        <a-entity
-          id="modelo"
-          gltf-model="#modelGLB"
-          position="0 0 0"
-          rotation="0 180 0"
-          scale="0.5 0.5 0.5">
-        </a-entity>
-      </a-marker>
+    </a-marker>
 
-      <!-- Cámara -->
-      <a-entity camera></a-entity>
-    </a-scene>
+    <!-- Cámara -->
+    <a-entity camera></a-entity>
+  </a-scene>
 
-    <!-- Verificación por consola -->
-    <script>
-      const modelo = document.querySelector('#modelo');
-
-      modelo.addEventListener('model-loaded', () => {
-        console.log('✅ Modelo GLB cargado correctamente');
-      });
-
-      modelo.addEventListener('model-error', (e) => {
-        console.error('❌ Error al cargar el modelo:', e.detail.src);
-        alert('Error al cargar el modelo. Verifica el nombre del archivo y su ruta.');
-      });
-    </script>
-  </body>
+  <!-- Eventos de carga -->
+  <script>
+    const modelo = document.querySelector('#modelo');
+    modelo.addEventListener('model-loaded', () => {
+      console.log('✅ Modelo GLB cargado correctamente');
+    });
+    modelo.addEventListener('model-error', (e) => {
+      console.error('❌ Error al cargar el modelo:', e.detail.src);
+      alert('Error al cargar el modelo. Verifica nombre o ruta.');
+    });
+  </script>
+</body>
 </html>
+
