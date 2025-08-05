@@ -1,63 +1,55 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <title>AR sobre marcador</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
-</head>
-<body style="margin: 0; overflow: hidden;">
-  <a-scene
-    embedded
-    vr-mode-ui="enabled: false"
-    arjs="sourceType: webcam; debugUIEnabled: false;"
-    renderer="logarithmicDepthBuffer: true;"
-  >
-    <!-- Carga del modelo -->
-    <a-assets>
-      <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
-    </a-assets>
+  <head>
+    <meta charset="UTF-8" />
+    <title>AR con click para colocar modelo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+  </head>
+  <body style="margin: 0; overflow: hidden;">
+    <a-scene
+      embedded
+      arjs="sourceType: webcam; debugUIEnabled: false;"
+      renderer="logarithmicDepthBuffer: true;"
+    >
+      <!-- Carga del modelo -->
+      <a-assets>
+        <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
+      </a-assets>
 
-    <!-- Marcador Hiro -->
-    <a-marker preset="hiro">
-      
-      <!-- Suelo virtual -->
-      <a-plane 
-        position="0 0 0" 
-        rotation="-90 0 0" 
-        width="1.5" 
-        height="1.5" 
-        color="#999" 
-        opacity="0.3">
-      </a-plane>
+      <!-- Cámara -->
+      <a-entity camera id="camera" look-controls></a-entity>
+    </a-scene>
 
-      <!-- Modelo cargado -->
-      <a-entity 
-        id="modelo"
-        gltf-model="#modelGLB"
-        position="0 0.05 0"
-        rotation="0 180 0"
-        scale="0.2 0.2 0.2">
-      </a-entity>
+    <script>
+      // Cuando haces click en la pantalla
+      document.body.addEventListener('click', function () {
+        const sceneEl = document.querySelector('a-scene');
+        const camera = document.querySelector('[camera]');
 
-    </a-marker>
+        // Obtiene la posición actual de la cámara
+        const camPos = camera.getAttribute('position');
+        const camRot = camera.getAttribute('rotation');
 
-    <!-- Cámara -->
-    <a-entity camera></a-entity>
-  </a-scene>
+        // Crea la entidad del modelo
+        const entity = document.createElement('a-entity');
+        entity.setAttribute('gltf-model', '#modelGLB');
+        entity.setAttribute('scale', '0.5 0.5 0.5');
 
-  <!-- Eventos de carga -->
-  <script>
-    const modelo = document.querySelector('#modelo');
-    modelo.addEventListener('model-loaded', () => {
-      console.log('✅ Modelo GLB cargado correctamente');
-    });
-    modelo.addEventListener('model-error', (e) => {
-      console.error('❌ Error al cargar el modelo:', e.detail.src);
-      alert('Error al cargar el modelo. Verifica nombre o ruta.');
-    });
-  </script>
-</body>
+        // Coloca el modelo frente a la cámara (a 1 metro)
+        const angle = camRot.y * (Math.PI / 180);
+        const distance = 1;
+        const x = camPos.x - Math.sin(angle) * distance;
+        const z = camPos.z - Math.cos(angle) * distance;
+
+        entity.setAttribute('position', { x: x, y: camPos.y - 0.5, z: z });
+
+        // Agrega el modelo a la escena
+        sceneEl.appendChild(entity);
+
+        console.log('✅ Modelo colocado en:', entity.getAttribute('position'));
+      });
+    </script>
+  </body>
 </html>
-
