@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>AR para Android - Modelo 3D</title>
+    <title>AR Android - Modelo Centrado</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
@@ -12,6 +12,7 @@
             overflow: hidden;
             font-family: Arial, sans-serif;
             touch-action: none;
+            background-color: #000;
         }
         .a-enter-vr {
             display: none !important;
@@ -22,17 +23,18 @@
         }
         #instructions {
             position: absolute;
-            bottom: 20px;
+            bottom: 30px;
             left: 0;
             right: 0;
             text-align: center;
             color: white;
             background-color: rgba(0,0,0,0.7);
-            padding: 15px;
+            padding: 15px 20px;
             z-index: 1000;
-            font-size: 18px;
-            border-radius: 10px;
-            margin: 0 20px;
+            font-size: 16px;
+            border-radius: 20px;
+            margin: 0 30px;
+            border: 2px solid rgba(255,255,255,0.3);
         }
         #loading {
             position: absolute;
@@ -40,14 +42,29 @@
             left: 50%;
             transform: translate(-50%, -50%);
             color: white;
-            font-size: 20px;
+            font-size: 18px;
             z-index: 1001;
+            background-color: rgba(0,0,0,0.7);
+            padding: 15px 25px;
+            border-radius: 20px;
+        }
+        #sensor-data {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background-color: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
-    <div id="loading">Cargando experiencia AR...</div>
-    <div id="instructions">Toca en cualquier lugar para colocar el modelo</div>
+    <div id="loading">Preparando realidad aumentada...</div>
+    <div id="instructions">Apunta tu dispositivo a una superficie plana y toca la pantalla</div>
+    <div id="sensor-data">Sensores: inicializando...</div>
     
     <a-scene
         embedded
@@ -60,7 +77,8 @@
         renderer="logarithmicDepthBuffer: true;
                  precision: high;
                  antialias: true;
-                 alpha: true"
+                 alpha: true;
+                 fov: 60"
         vr-mode-ui="enabled: false">
         
         <a-assets>
@@ -70,38 +88,66 @@
         <a-entity 
             camera
             id="camera"
-            look-controls="pointerLockEnabled: false; touchEnabled: true"
+            look-controls="pointerLockEnabled: false; 
+                          touchEnabled: true;
+                          magicWindowTrackingEnabled: true"
             wasd-controls="enabled: false">
         </a-entity>
     </a-scene>
 
     <script>
-        // Variables de configuración para Android
+        // Configuración optimizada para Android
         const isAndroid = /Android/i.test(navigator.userAgent);
         const config = {
-            scale: isAndroid ? 0.25 : 0.35,       // Escala más pequeña para Android
-            distance: isAndroid ? 1.8 : 1.5,      // Mayor distancia para Android
-            yOffset: isAndroid ? -0.4 : -0.3,     // Ajuste de altura
-            rotationOffset: isAndroid ? 180 : 0    // Corrección de rotación
+            scale: isAndroid ? 0.12 : 0.15,      // Escala más pequeña
+            distance: 1.5,                       // Distancia fija
+            yOffset: isAndroid ? -0.3 : -0.2,    // Ajuste de altura
+            rotationOffset: 0,                    // Sin corrección de rotación
+            fov: 60                              // Campo de visión
         };
+
+        // Variables para seguimiento de sensores
+        let sensorInitialized = false;
+        let beta = 0, gamma = 0;
+
+        // Inicializar sensores
+        function initSensors() {
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', handleOrientation);
+                document.getElementById('sensor-data').textContent = "Sensores: Activados";
+            } else {
+                document.getElementById('sensor-data').textContent = "Sensores: No soportados";
+            }
+        }
+
+        // Manejar datos de orientación
+        function handleOrientation(event) {
+            beta = event.beta;  // Inclinación frontal (grados)
+            gamma = event.gamma; // Inclinación lateral (grados)
+            
+            if (!sensorInitialized) {
+                sensorInitialized = true;
+                document.getElementById('sensor-data').textContent = 
+                    `Sensores: Beta: ${beta.toFixed(1)}° | Gamma: ${gamma.toFixed(1)}°`;
+            }
+        }
 
         // Ocultar carga cuando la escena esté lista
         document.querySelector('a-scene').addEventListener('loaded', function() {
             document.getElementById('loading').style.display = 'none';
+            initSensors();
             
-            // Ocultar instrucciones después de 7 segundos
-            setTimeout(function() {
-                const instructions = document.getElementById('instructions');
-                if (instructions) instructions.style.opacity = '0.5';
-            }, 7000);
+            // Actualizar datos de sensores periódicamente
+            setInterval(() => {
+                if (sensorInitialized) {
+                    document.getElementById('sensor-data').textContent = 
+                        `Orientación: Beta: ${beta.toFixed(1)}° | Gamma: ${gamma.toFixed(1)}°`;
+                }
+            }, 500);
         });
 
         // Colocar modelo al hacer click
-        document.body.addEventListener('click', function(evt) {
-            // Evitar múltiples toques rápidos
-            if (Date.now() - (window.lastModelPlacement || 0) < 1000) return;
-            window.lastModelPlacement = Date.now();
-            
+        document.body.addEventListener('click', function() {
             const sceneEl = document.querySelector('a-scene');
             const camera = document.querySelector('[camera]');
             
@@ -109,14 +155,12 @@
             const oldModel = document.querySelector('[gltf-model]');
             if (oldModel) sceneEl.removeChild(oldModel);
             
-            // Obtener posición y rotación de la cámara
-            const camPos = camera.getAttribute('position');
-            const camRot = camera.getAttribute('rotation');
-            
-            // Calcular posición frente a la cámara
-            const angle = camRot.y * (Math.PI / 180);
-            const x = camPos.x - Math.sin(angle) * config.distance;
-            const z = camPos.z - Math.cos(angle) * config.distance;
+            // Posición fija en el centro de la pantalla
+            const position = {
+                x: 0,
+                y: config.yOffset,
+                z: -config.distance
+            };
             
             // Crear y configurar el modelo
             const model = document.createElement('a-entity');
@@ -126,24 +170,31 @@
                 y: config.scale,
                 z: config.scale
             });
-            model.setAttribute('position', {
-                x: x,
-                y: camPos.y + config.yOffset,
-                z: z
-            });
+            model.setAttribute('position', position);
             model.setAttribute('rotation', {
                 x: 0,
-                y: camRot.y + config.rotationOffset,
+                y: 0,
                 z: 0
             });
             
-            // Animación de aparición
-            model.setAttribute('animation', {
+            // Ajustar el frustum para evitar recorte
+            model.setAttribute('frustum-culled', 'false');
+            
+            // Animación de aparición mejorada
+            model.setAttribute('animation__scale', {
                 property: 'scale',
                 from: '0.01 0.01 0.01',
                 to: `${config.scale} ${config.scale} ${config.scale}`,
-                dur: 800,
+                dur: 1000,
                 easing: 'easeOutElastic'
+            });
+            
+            model.setAttribute('animation__position', {
+                property: 'position',
+                from: {x: position.x, y: position.y + 0.5, z: position.z + 0.5},
+                to: position,
+                dur: 800,
+                easing: 'easeOutQuad'
             });
             
             // Sombra para mejor visualización
@@ -155,52 +206,30 @@
             // Añadir a la escena
             sceneEl.appendChild(model);
             
-            // Feedback visual
-            showPlacementFeedback(x, camPos.y + config.yOffset, z);
-            
-            // Ocultar instrucciones al colocar el modelo
+            // Ocultar instrucciones
             document.getElementById('instructions').style.display = 'none';
         });
 
-        // Mostrar efecto al colocar el modelo
-        function showPlacementFeedback(x, y, z) {
+        // Ajustar dinámicamente el campo de visión
+        function adjustFOV() {
             const scene = document.querySelector('a-scene');
+            const camera = document.querySelector('[camera]');
+            const aspectRatio = window.innerWidth / window.innerHeight;
             
-            // Crear efecto de ondas concéntricas
-            const ripple = document.createElement('a-entity');
-            ripple.setAttribute('position', {x: x, y: y, z: z});
-            ripple.setAttribute('geometry', {
-                primitive: 'ring',
-                radiusInner: 0.05,
-                radiusOuter: 0.1
-            });
-            ripple.setAttribute('material', {
-                color: '#00FFFF',
-                shader: 'flat',
-                opacity: 0.8
-            });
-            ripple.setAttribute('animation', {
-                property: 'scale',
-                from: '1 1 1',
-                to: '3 3 3',
-                dur: 500,
-                easing: 'easeOutQuad'
-            });
-            ripple.setAttribute('animation__opacity', {
-                property: 'material.opacity',
-                from: 0.8,
-                to: 0,
-                dur: 500,
-                easing: 'easeOutQuad'
-            });
-            
-            // Auto-eliminarse después de la animación
-            ripple.addEventListener('animationcomplete', function() {
-                scene.removeChild(ripple);
-            });
-            
-            scene.appendChild(ripple);
+            // Ajustar FOV basado en la orientación del dispositivo
+            if (window.innerHeight > window.innerWidth) {
+                // Portrait
+                camera.setAttribute('camera', 'fov', config.fov);
+            } else {
+                // Landscape
+                camera.setAttribute('camera', 'fov', config.fov * 0.75);
+            }
         }
+
+        // Ajustar FOV al cargar y al cambiar orientación
+        window.addEventListener('load', adjustFOV);
+        window.addEventListener('resize', adjustFOV);
+        window.addEventListener('orientationchange', adjustFOV);
     </script>
 </body>
 </html>
