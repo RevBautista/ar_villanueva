@@ -2,26 +2,13 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>AR Android - Modelo Centrado</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>AR con Detección de Planos Reales</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-ar@1.7.0/dist/aframe-ar.min.js"></script>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-            touch-action: none;
-            background-color: #000;
-        }
-        .a-enter-vr {
-            display: none !important;
-        }
-        a-scene {
-            width: 100vw;
-            height: 100vh;
-        }
-        #instructions {
+        body { margin: 0; overflow: hidden; }
+        #ar-prompt {
             position: absolute;
             bottom: 30px;
             left: 0;
@@ -29,207 +16,106 @@
             text-align: center;
             color: white;
             background-color: rgba(0,0,0,0.7);
-            padding: 15px 20px;
-            z-index: 1000;
-            font-size: 16px;
-            border-radius: 20px;
-            margin: 0 30px;
-            border: 2px solid rgba(255,255,255,0.3);
-        }
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 18px;
-            z-index: 1001;
-            background-color: rgba(0,0,0,0.7);
-            padding: 15px 25px;
-            border-radius: 20px;
-        }
-        #sensor-data {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            background-color: rgba(0,0,0,0.5);
-            padding: 10px;
+            padding: 15px;
             border-radius: 10px;
-            font-size: 12px;
+            margin: 0 20px;
             z-index: 1000;
         }
     </style>
 </head>
 <body>
-    <div id="loading">Preparando realidad aumentada...</div>
-    <div id="instructions">Apunta tu dispositivo a una superficie plana y toca la pantalla</div>
-    <div id="sensor-data">Sensores: inicializando...</div>
+    <div id="ar-prompt">Toque para colocar el modelo en una superficie plana</div>
     
     <a-scene
-        embedded
-        arjs="sourceType: webcam;
-              debugUIEnabled: false;
-              detectionMode: mono_and_matrix;
-              matrixCodeType: 3x3;
-              maxDetectionRate: 60;
-              cameraParametersUrl: https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/data/camera_para.dat"
-        renderer="logarithmicDepthBuffer: true;
-                 precision: high;
-                 antialias: true;
-                 alpha: true;
-                 fov: 60"
-        vr-mode-ui="enabled: false">
+        vr-mode-ui="enabled: false"
+        xr-mode-ui="XRMode: immersive-ar"
+        arjs="sourceType: webcam; debugUIEnabled: false;"
+        renderer="logarithmicDepthBuffer: true; precision: high;">
         
         <a-assets>
-            <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
+            <a-asset-item id="model" src="model.glb"></a-asset-item>
         </a-assets>
 
-        <a-entity 
-            camera
-            id="camera"
-            look-controls="pointerLockEnabled: false; 
-                          touchEnabled: true;
-                          magicWindowTrackingEnabled: true"
-            wasd-controls="enabled: false">
-        </a-entity>
+        <!-- Entidad para el modelo que se colocará -->
+        <a-entity id="model-entity" gltf-model="#model" scale="0.1 0.1 0.1" visible="false"></a-entity>
+        
+        <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-        // Configuración optimizada para Android
-        const isAndroid = /Android/i.test(navigator.userAgent);
-        const config = {
-            scale: isAndroid ? 0.12 : 0.15,      // Escala más pequeña
-            distance: 1.5,                       // Distancia fija
-            yOffset: isAndroid ? -0.3 : -0.2,    // Ajuste de altura
-            rotationOffset: 0,                    // Sin corrección de rotación
-            fov: 60                              // Campo de visión
-        };
-
-        // Variables para seguimiento de sensores
-        let sensorInitialized = false;
-        let beta = 0, gamma = 0;
-
-        // Inicializar sensores
-        function initSensors() {
-            if (window.DeviceOrientationEvent) {
-                window.addEventListener('deviceorientation', handleOrientation);
-                document.getElementById('sensor-data').textContent = "Sensores: Activados";
-            } else {
-                document.getElementById('sensor-data').textContent = "Sensores: No soportados";
+        let hitTestSource = null;
+        let modelPlaced = false;
+        const modelEntity = document.getElementById('model-entity');
+        const arPrompt = document.getElementById('ar-prompt');
+        
+        // Verificar soporte para WebXR AR
+        async function checkXRSupport() {
+            if (!navigator.xr) {
+                arPrompt.textContent = "AR no es compatible con tu dispositivo";
+                return false;
             }
-        }
-
-        // Manejar datos de orientación
-        function handleOrientation(event) {
-            beta = event.beta;  // Inclinación frontal (grados)
-            gamma = event.gamma; // Inclinación lateral (grados)
             
-            if (!sensorInitialized) {
-                sensorInitialized = true;
-                document.getElementById('sensor-data').textContent = 
-                    `Sensores: Beta: ${beta.toFixed(1)}° | Gamma: ${gamma.toFixed(1)}°`;
-            }
-        }
-
-        // Ocultar carga cuando la escena esté lista
-        document.querySelector('a-scene').addEventListener('loaded', function() {
-            document.getElementById('loading').style.display = 'none';
-            initSensors();
-            
-            // Actualizar datos de sensores periódicamente
-            setInterval(() => {
-                if (sensorInitialized) {
-                    document.getElementById('sensor-data').textContent = 
-                        `Orientación: Beta: ${beta.toFixed(1)}° | Gamma: ${gamma.toFixed(1)}°`;
+            try {
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!supported) {
+                    arPrompt.textContent = "AR no está disponible. Intenta con un dispositivo Android compatible con ARCore";
+                    return false;
                 }
-            }, 500);
-        });
-
-        // Colocar modelo al hacer click
-        document.body.addEventListener('click', function() {
-            const sceneEl = document.querySelector('a-scene');
-            const camera = document.querySelector('[camera]');
-            
-            // Eliminar modelo anterior si existe
-            const oldModel = document.querySelector('[gltf-model]');
-            if (oldModel) sceneEl.removeChild(oldModel);
-            
-            // Posición fija en el centro de la pantalla
-            const position = {
-                x: 0,
-                y: config.yOffset,
-                z: -config.distance
-            };
-            
-            // Crear y configurar el modelo
-            const model = document.createElement('a-entity');
-            model.setAttribute('gltf-model', '#modelGLB');
-            model.setAttribute('scale', {
-                x: config.scale,
-                y: config.scale,
-                z: config.scale
-            });
-            model.setAttribute('position', position);
-            model.setAttribute('rotation', {
-                x: 0,
-                y: 0,
-                z: 0
-            });
-            
-            // Ajustar el frustum para evitar recorte
-            model.setAttribute('frustum-culled', 'false');
-            
-            // Animación de aparición mejorada
-            model.setAttribute('animation__scale', {
-                property: 'scale',
-                from: '0.01 0.01 0.01',
-                to: `${config.scale} ${config.scale} ${config.scale}`,
-                dur: 1000,
-                easing: 'easeOutElastic'
-            });
-            
-            model.setAttribute('animation__position', {
-                property: 'position',
-                from: {x: position.x, y: position.y + 0.5, z: position.z + 0.5},
-                to: position,
-                dur: 800,
-                easing: 'easeOutQuad'
-            });
-            
-            // Sombra para mejor visualización
-            model.setAttribute('shadow', {
-                cast: true,
-                receive: false
-            });
-            
-            // Añadir a la escena
-            sceneEl.appendChild(model);
-            
-            // Ocultar instrucciones
-            document.getElementById('instructions').style.display = 'none';
-        });
-
-        // Ajustar dinámicamente el campo de visión
-        function adjustFOV() {
-            const scene = document.querySelector('a-scene');
-            const camera = document.querySelector('[camera]');
-            const aspectRatio = window.innerWidth / window.innerHeight;
-            
-            // Ajustar FOV basado en la orientación del dispositivo
-            if (window.innerHeight > window.innerWidth) {
-                // Portrait
-                camera.setAttribute('camera', 'fov', config.fov);
-            } else {
-                // Landscape
-                camera.setAttribute('camera', 'fov', config.fov * 0.75);
+                return true;
+            } catch (error) {
+                console.error("Error checking XR support:", error);
+                return false;
             }
         }
-
-        // Ajustar FOV al cargar y al cambiar orientación
-        window.addEventListener('load', adjustFOV);
-        window.addEventListener('resize', adjustFOV);
-        window.addEventListener('orientationchange', adjustFOV);
+        
+        // Iniciar sesión AR
+        async function startAR() {
+            const sceneEl = document.querySelector('a-scene');
+            const xrSession = await sceneEl.xrSession;
+            
+            // Configurar hit test para detección de planos
+            const space = await xrSession.requestReferenceSpace('viewer');
+            hitTestSource = await xrSession.requestHitTestSource({ space });
+            
+            // Manejar clics para colocar modelo
+            sceneEl.addEventListener('click', (evt) => {
+                if (modelPlaced || !hitTestSource) return;
+                
+                const frame = evt.detail.frame;
+                const hitTestResults = frame.getHitTestResults(hitTestSource);
+                
+                if (hitTestResults.length > 0) {
+                    const pose = hitTestResults[0].getPose(space);
+                    
+                    modelEntity.setAttribute('position', {
+                        x: pose.transform.position.x,
+                        y: pose.transform.position.y,
+                        z: pose.transform.position.z
+                    });
+                    
+                    modelEntity.setAttribute('visible', 'true');
+                    modelEntity.setAttribute('animation', {
+                        property: 'scale',
+                        from: '0.01 0.01 0.01',
+                        to: '0.1 0.1 0.1',
+                        dur: 1000,
+                        easing: 'easeOutElastic'
+                    });
+                    
+                    modelPlaced = true;
+                    arPrompt.style.display = 'none';
+                }
+            });
+        }
+        
+        // Inicializar
+        (async function() {
+            const supported = await checkXRSupport();
+            if (supported) {
+                arPrompt.textContent = "Mueve el dispositivo para detectar superficies planas";
+                startAR();
+            }
+        })();
     </script>
 </body>
 </html>
