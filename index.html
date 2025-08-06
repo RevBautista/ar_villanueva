@@ -2,13 +2,18 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>AR con Detección de Planos Reales</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AR con Detección Automática de Planos</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aframe-ar@1.7.0/dist/aframe-ar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-xr@1.1.1/dist/aframe-xr.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; }
-        #ar-prompt {
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #000;
+        }
+        #ar-overlay {
             position: absolute;
             bottom: 30px;
             left: 0;
@@ -17,103 +22,193 @@
             color: white;
             background-color: rgba(0,0,0,0.7);
             padding: 15px;
-            border-radius: 10px;
+            border-radius: 20px;
             margin: 0 20px;
             z-index: 1000;
+            font-size: 16px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background-color: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1001;
         }
     </style>
 </head>
 <body>
-    <div id="ar-prompt">Toque para colocar el modelo en una superficie plana</div>
+    <div id="loading">Inicializando realidad aumentada...</div>
+    <div id="ar-overlay">Mueve el dispositivo para detectar superficies planas</div>
     
     <a-scene
-        vr-mode-ui="enabled: false"
         xr-mode-ui="XRMode: immersive-ar"
-        arjs="sourceType: webcam; debugUIEnabled: false;"
-        renderer="logarithmicDepthBuffer: true; precision: high;">
+        vr-mode-ui="enabled: false"
+        renderer="antialias: true; logarithmicDepthBuffer: true; precision: high;">
         
         <a-assets>
             <a-asset-item id="model" src="model.glb"></a-asset-item>
         </a-assets>
 
-        <!-- Entidad para el modelo que se colocará -->
-        <a-entity id="model-entity" gltf-model="#model" scale="0.1 0.1 0.1" visible="false"></a-entity>
-        
+        <!-- Entidad del modelo que aparecerá en superficies planas -->
+        <a-entity 
+            id="ar-model"
+            gltf-model="#model"
+            scale="0.15 0.15 0.15"
+            visible="false"
+            shadow="cast: true; receive: false">
+        </a-entity>
+
         <a-entity camera></a-entity>
     </a-scene>
 
     <script>
+        // Variables globales
+        let xrSession = null;
+        let xrReferenceSpace = null;
         let hitTestSource = null;
         let modelPlaced = false;
-        const modelEntity = document.getElementById('model-entity');
-        const arPrompt = document.getElementById('ar-prompt');
-        
-        // Verificar soporte para WebXR AR
+        let animationFrameId = null;
+
+        // Elementos DOM
+        const loadingElement = document.getElementById('loading');
+        const overlayElement = document.getElementById('ar-overlay');
+        const modelElement = document.getElementById('ar-model');
+        const sceneElement = document.querySelector('a-scene');
+
+        // Verificar soporte WebXR AR
         async function checkXRSupport() {
             if (!navigator.xr) {
-                arPrompt.textContent = "AR no es compatible con tu dispositivo";
+                showError("Tu navegador no soporta WebXR. Usa Chrome en Android.");
                 return false;
             }
-            
+
             try {
                 const supported = await navigator.xr.isSessionSupported('immersive-ar');
                 if (!supported) {
-                    arPrompt.textContent = "AR no está disponible. Intenta con un dispositivo Android compatible con ARCore";
+                    showError("AR no disponible. Necesitas un dispositivo con ARCore/ARKit.");
                     return false;
                 }
                 return true;
             } catch (error) {
-                console.error("Error checking XR support:", error);
+                console.error("Error verificando soporte XR:", error);
+                showError("Error al verificar AR. Intenta recargar.");
                 return false;
             }
         }
-        
+
         // Iniciar sesión AR
-        async function startAR() {
-            const sceneEl = document.querySelector('a-scene');
-            const xrSession = await sceneEl.xrSession;
-            
-            // Configurar hit test para detección de planos
-            const space = await xrSession.requestReferenceSpace('viewer');
-            hitTestSource = await xrSession.requestHitTestSource({ space });
-            
-            // Manejar clics para colocar modelo
-            sceneEl.addEventListener('click', (evt) => {
-                if (modelPlaced || !hitTestSource) return;
-                
-                const frame = evt.detail.frame;
-                const hitTestResults = frame.getHitTestResults(hitTestSource);
+        async function startXRSession() {
+            try {
+                xrSession = await navigator.xr.requestSession('immersive-ar', {
+                    requiredFeatures: ['hit-test'],
+                    optionalFeatures: ['dom-overlay']
+                });
+
+                sceneElement.xrSession = xrSession;
+                xrReferenceSpace = await xrSession.requestReferenceSpace('viewer');
+                hitTestSource = await xrSession.requestHitTestSource({ space: xrReferenceSpace });
+
+                setupXRFrameLoop();
+                setupEventListeners();
+
+                loadingElement.style.display = 'none';
+                overlayElement.textContent = "Toca una superficie plana para colocar el modelo";
+
+            } catch (error) {
+                console.error("Error al iniciar sesión AR:", error);
+                showError("No se pudo iniciar AR. Verifica los permisos de cámara.");
+            }
+        }
+
+        // Loop de renderizado AR
+        function setupXRFrameLoop() {
+            xrSession.requestAnimationFrame(onXRFrame);
+        }
+
+        // Procesar cada frame AR
+        function onXRFrame(time, xrFrame) {
+            animationFrameId = xrSession.requestAnimationFrame(onXRFrame);
+
+            if (!modelPlaced && hitTestSource) {
+                const hitTestResults = xrFrame.getHitTestResults(hitTestSource);
                 
                 if (hitTestResults.length > 0) {
-                    const pose = hitTestResults[0].getPose(space);
-                    
-                    modelEntity.setAttribute('position', {
-                        x: pose.transform.position.x,
-                        y: pose.transform.position.y,
-                        z: pose.transform.position.z
-                    });
-                    
-                    modelEntity.setAttribute('visible', 'true');
-                    modelEntity.setAttribute('animation', {
-                        property: 'scale',
-                        from: '0.01 0.01 0.01',
-                        to: '0.1 0.1 0.1',
-                        dur: 1000,
-                        easing: 'easeOutElastic'
-                    });
-                    
-                    modelPlaced = true;
-                    arPrompt.style.display = 'none';
+                    const pose = hitTestResults[0].getPose(xrReferenceSpace);
+                    updateModelPosition(pose.transform);
                 }
+            }
+        }
+
+        // Actualizar posición del modelo
+        function updateModelPosition(transform) {
+            const position = transform.position;
+            const orientation = transform.orientation;
+            
+            modelElement.setAttribute('position', {
+                x: position.x,
+                y: position.y,
+                z: position.z
+            });
+            
+            modelElement.setAttribute('rotation', {
+                x: 0,
+                y: Math.atan2(2 * (orientation.w * orientation.y + orientation.x * orientation.z, 
+                              1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z)) * (180 / Math.PI),
+                z: 0
             });
         }
-        
-        // Inicializar
-        (async function() {
+
+        // Configurar listeners de eventos
+        function setupEventListeners() {
+            // Colocar modelo al tocar
+            sceneElement.addEventListener('click', () => {
+                if (!modelPlaced && modelElement.getAttribute('visible') === 'false') {
+                    modelElement.setAttribute('visible', 'true');
+                    modelElement.setAttribute('animation', {
+                        property: 'scale',
+                        from: '0.01 0.01 0.01',
+                        to: '0.15 0.15 0.15',
+                        dur: 800,
+                        easing: 'easeOutElastic'
+                    });
+                    modelPlaced = true;
+                    overlayElement.style.display = 'none';
+                }
+            });
+
+            // Manejar fin de sesión
+            xrSession.addEventListener('end', () => {
+                cancelAnimationFrame(animationFrameId);
+                resetARState();
+            });
+        }
+
+        // Resetear estado AR
+        function resetARState() {
+            modelElement.setAttribute('visible', 'false');
+            modelElement.removeAttribute('animation');
+            modelPlaced = false;
+            overlayElement.style.display = 'block';
+            overlayElement.textContent = "Sesión AR terminada. Recarga para reiniciar.";
+        }
+
+        // Mostrar errores
+        function showError(message) {
+            loadingElement.style.display = 'none';
+            overlayElement.textContent = message;
+            overlayElement.style.backgroundColor = 'rgba(200,0,0,0.7)';
+        }
+
+        // Inicialización
+        (async function init() {
             const supported = await checkXRSupport();
             if (supported) {
-                arPrompt.textContent = "Mueve el dispositivo para detectar superficies planas";
-                startAR();
+                await startXRSession();
             }
         })();
     </script>
