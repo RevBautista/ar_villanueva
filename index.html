@@ -38,10 +38,44 @@
             max-width: 90%;
             box-sizing: border-box;
         }
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background-color: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1001;
+            text-align: center;
+        }
+        .progress-bar {
+            width: 200px;
+            height: 20px;
+            background-color: #333;
+            margin: 10px auto;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s;
+        }
     </style>
 </head>
 <body>
-    <div id="instructions">Toca la pantalla para colocar el modelo 3D</div>
+    <div id="loading">
+        <h3>Cargando recursos 3D</h3>
+        <div class="progress-bar">
+            <div class="progress" id="progress"></div>
+        </div>
+        <p id="loading-text">Inicializando...</p>
+    </div>
+    
+    <div id="instructions" style="display: none;">Toca la pantalla para colocar el modelo 3D</div>
     
     <a-scene
         embedded
@@ -58,7 +92,7 @@
         vr-mode-ui="enabled: false">
         
         <!-- Carga del modelo -->
-        <a-assets>
+        <a-assets timeout="30000">
             <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
         </a-assets>
 
@@ -73,21 +107,69 @@
     </a-scene>
 
     <script>
-        // Esperar a que la escena esté cargada
-        document.querySelector('a-scene').addEventListener('loaded', function() {
-            // Ocultar instrucciones después de 5 segundos
-            setTimeout(function() {
-                document.getElementById('instructions').style.display = 'none';
-            }, 5000);
+        // Mostrar estado de carga
+        const loadingEl = document.getElementById('loading');
+        const progressEl = document.getElementById('progress');
+        const loadingText = document.getElementById('loading-text');
+        const instructionsEl = document.getElementById('instructions');
+        
+        // Eventos de carga de recursos
+        const sceneEl = document.querySelector('a-scene');
+        
+        sceneEl.addEventListener('loaded', function() {
+            loadingText.textContent = "Escena cargada, cargando modelo...";
+            progressEl.style.width = '30%';
+        });
+        
+        sceneEl.addEventListener('asset-loaded', function(e) {
+            if (e.detail.id === 'modelGLB') {
+                loadingText.textContent = "Modelo cargado correctamente!";
+                progressEl.style.width = '100%';
+                
+                // Ocultar loading y mostrar instrucciones después de un breve retraso
+                setTimeout(function() {
+                    loadingEl.style.display = 'none';
+                    instructionsEl.style.display = 'block';
+                    
+                    // Ocultar instrucciones después de 5 segundos
+                    setTimeout(function() {
+                        instructionsEl.style.display = 'none';
+                    }, 5000);
+                }, 1000);
+            }
+        });
+        
+        sceneEl.addEventListener('asset-error', function(e) {
+            console.error("Error cargando asset:", e.detail);
+            loadingText.textContent = "Error cargando el modelo: " + (e.detail.message || "Error desconocido");
+            progressEl.style.backgroundColor = "#f44336";
+            
+            // Mostrar opción para recargar
+            const reloadBtn = document.createElement('button');
+            reloadBtn.textContent = "Reintentar";
+            reloadBtn.style.marginTop = "10px";
+            reloadBtn.style.padding = "8px 16px";
+            reloadBtn.style.backgroundColor = "#4CAF50";
+            reloadBtn.style.color = "white";
+            reloadBtn.style.border = "none";
+            reloadBtn.style.borderRadius = "4px";
+            reloadBtn.style.cursor = "pointer";
+            reloadBtn.addEventListener('click', function() {
+                window.location.reload();
+            });
+            
+            loadingEl.appendChild(reloadBtn);
         });
 
         // Cuando haces click en la pantalla
         document.body.addEventListener('click', function(evt) {
+            // Solo permitir colocar modelo cuando esté completamente cargado
+            if (loadingEl.style.display !== 'none') return;
+            
             // Evitar múltiples toques rápidos
             if (Date.now() - (window.lastModelPlacement || 0) < 500) return;
             window.lastModelPlacement = Date.now();
             
-            const sceneEl = document.querySelector('a-scene');
             const camera = document.querySelector('[camera]');
             
             // Eliminar modelos anteriores si es necesario
