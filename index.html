@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR con Detección Automática de Planos</title>
+    <title>AR Optimizado para Android</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-xr@1.1.1/dist/aframe-xr.min.js"></script>
     <style>
@@ -12,6 +12,36 @@
             overflow: hidden;
             font-family: Arial, sans-serif;
             background-color: #000;
+            touch-action: none;
+        }
+        #preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+        #loader {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #4CAF50;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+        #loader-text {
+            color: white;
+            margin-top: 20px;
+            text-align: center;
+            font-size: 16px;
         }
         #ar-overlay {
             position: absolute;
@@ -27,34 +57,39 @@
             z-index: 1000;
             font-size: 16px;
             border: 1px solid rgba(255,255,255,0.3);
+            display: none;
         }
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            background-color: rgba(0,0,0,0.7);
-            padding: 20px;
-            border-radius: 10px;
-            z-index: 1001;
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .error-message {
+            color: #ff4444;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <div id="loading">Inicializando realidad aumentada...</div>
-    <div id="ar-overlay">Mueve el dispositivo para detectar superficies planas</div>
+    <!-- Preloader con animación -->
+    <div id="preloader">
+        <div id="loader"></div>
+        <div id="loader-text">Inicializando realidad aumentada...</div>
+    </div>
+
+    <!-- Mensajes AR -->
+    <div id="ar-overlay">Mueve el dispositivo lentamente para detectar superficies</div>
     
+    <!-- Escena AR (inicialmente oculta) -->
     <a-scene
         xr-mode-ui="XRMode: immersive-ar"
         vr-mode-ui="enabled: false"
-        renderer="antialias: true; logarithmicDepthBuffer: true; precision: high;">
+        renderer="antialias: true; logarithmicDepthBuffer: true; precision: high;"
+        style="display: none;">
         
         <a-assets>
             <a-asset-item id="model" src="model.glb"></a-asset-item>
         </a-assets>
 
-        <!-- Entidad del modelo que aparecerá en superficies planas -->
+        <!-- Modelo AR -->
         <a-entity 
             id="ar-model"
             gltf-model="#model"
@@ -69,107 +104,162 @@
     <script>
         // Variables globales
         let xrSession = null;
-        let xrReferenceSpace = null;
         let hitTestSource = null;
         let modelPlaced = false;
-        let animationFrameId = null;
+        let retryCount = 0;
+        const MAX_RETRIES = 3;
 
         // Elementos DOM
-        const loadingElement = document.getElementById('loading');
-        const overlayElement = document.getElementById('ar-overlay');
-        const modelElement = document.getElementById('ar-model');
-        const sceneElement = document.querySelector('a-scene');
+        const preloader = document.getElementById('preloader');
+        const loaderText = document.getElementById('loader-text');
+        const overlay = document.getElementById('ar-overlay');
+        const scene = document.querySelector('a-scene');
+        const model = document.getElementById('ar-model');
 
-        // Verificar soporte WebXR AR
+        // Estados de inicialización
+        const states = {
+            CHECKING_SUPPORT: "Verificando compatibilidad con AR...",
+            LOADING_ASSETS: "Cargando recursos 3D...",
+            STARTING_AR: "Iniciando sesión AR...",
+            READY: "¡Listo!",
+            ERROR: "Error"
+        };
+
+        // Actualizar mensaje de carga
+        function updateLoaderText(message, isError = false) {
+            loaderText.innerHTML = isError 
+                ? `<span class="error-message">${message}</span>` 
+                : message;
+            console.log(message);
+        }
+
+        // Mostrar error y opciones
+        function showError(message) {
+            updateLoaderText(`${states.ERROR}: ${message}`, true);
+            
+            // Ocultar spinner y mostrar opciones
+            document.getElementById('loader').style.display = 'none';
+            
+            // Botón para reintentar
+            const retryButton = document.createElement('button');
+            retryButton.textContent = 'Reintentar';
+            retryButton.style = `
+                padding: 10px 20px;
+                margin-top: 20px;
+                background: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                font-size: 16px;
+                cursor: pointer;
+            `;
+            retryButton.onclick = initializeAR;
+            
+            // Reemplazar contenido si es necesario
+            if (!loaderText.querySelector('button')) {
+                loaderText.innerHTML = '';
+                loaderText.appendChild(document.createTextNode(`${states.ERROR}: ${message}`));
+                loaderText.appendChild(document.createElement('br'));
+                loaderText.appendChild(retryButton);
+            }
+        }
+
+        // Verificar soporte WebXR
         async function checkXRSupport() {
+            updateLoaderText(states.CHECKING_SUPPORT);
+            
             if (!navigator.xr) {
-                showError("Tu navegador no soporta WebXR. Usa Chrome en Android.");
-                return false;
+                throw new Error("WebXR no está disponible en tu navegador. Usa Chrome en Android.");
             }
 
             try {
-                const supported = await navigator.xr.isSessionSupported('immersive-ar');
-                if (!supported) {
-                    showError("AR no disponible. Necesitas un dispositivo con ARCore/ARKit.");
-                    return false;
-                }
-                return true;
+                return await navigator.xr.isSessionSupported('immersive-ar');
             } catch (error) {
                 console.error("Error verificando soporte XR:", error);
-                showError("Error al verificar AR. Intenta recargar.");
-                return false;
+                throw new Error("No se pudo verificar el soporte AR. Intenta recargar la página.");
             }
+        }
+
+        // Precargar assets
+        async function preloadAssets() {
+            updateLoaderText(states.LOADING_ASSETS);
+            
+            return new Promise((resolve) => {
+                scene.addEventListener('loaded', resolve);
+                
+                // Timeout para assets que no cargan
+                setTimeout(() => {
+                    if (scene.hasLoaded) return;
+                    console.warn("Los assets están tardando más de lo esperado...");
+                }, 5000);
+            });
         }
 
         // Iniciar sesión AR
         async function startXRSession() {
+            updateLoaderText(states.STARTING_AR);
+            
             try {
                 xrSession = await navigator.xr.requestSession('immersive-ar', {
                     requiredFeatures: ['hit-test'],
                     optionalFeatures: ['dom-overlay']
                 });
 
-                sceneElement.xrSession = xrSession;
-                xrReferenceSpace = await xrSession.requestReferenceSpace('viewer');
-                hitTestSource = await xrSession.requestHitTestSource({ space: xrReferenceSpace });
+                scene.xrSession = xrSession;
+                const refSpace = await xrSession.requestReferenceSpace('viewer');
+                hitTestSource = await xrSession.requestHitTestSource({ space: refSpace });
 
-                setupXRFrameLoop();
-                setupEventListeners();
+                // Configurar el loop de renderizado
+                xrSession.requestAnimationFrame(onXRFrame);
 
-                loadingElement.style.display = 'none';
-                overlayElement.textContent = "Toca una superficie plana para colocar el modelo";
+                // Mostrar escena cuando todo esté listo
+                scene.style.display = 'block';
+                overlay.style.display = 'block';
+                updateLoaderText(states.READY);
+                
+                // Ocultar preloader con animación
+                setTimeout(() => {
+                    preloader.style.opacity = '0';
+                    setTimeout(() => {
+                        preloader.style.display = 'none';
+                    }, 500);
+                }, 1000);
 
             } catch (error) {
                 console.error("Error al iniciar sesión AR:", error);
-                showError("No se pudo iniciar AR. Verifica los permisos de cámara.");
+                throw new Error("No se pudo iniciar AR. Verifica los permisos de cámara.");
             }
         }
 
         // Loop de renderizado AR
-        function setupXRFrameLoop() {
-            xrSession.requestAnimationFrame(onXRFrame);
-        }
-
-        // Procesar cada frame AR
         function onXRFrame(time, xrFrame) {
-            animationFrameId = xrSession.requestAnimationFrame(onXRFrame);
-
             if (!modelPlaced && hitTestSource) {
                 const hitTestResults = xrFrame.getHitTestResults(hitTestSource);
                 
                 if (hitTestResults.length > 0) {
-                    const pose = hitTestResults[0].getPose(xrReferenceSpace);
+                    const pose = hitTestResults[0].getPose(xrFrame.session.requestReferenceSpace('viewer'));
                     updateModelPosition(pose.transform);
                 }
             }
+            
+            xrSession.requestAnimationFrame(onXRFrame);
         }
 
         // Actualizar posición del modelo
         function updateModelPosition(transform) {
-            const position = transform.position;
-            const orientation = transform.orientation;
-            
-            modelElement.setAttribute('position', {
-                x: position.x,
-                y: position.y,
-                z: position.z
-            });
-            
-            modelElement.setAttribute('rotation', {
-                x: 0,
-                y: Math.atan2(2 * (orientation.w * orientation.y + orientation.x * orientation.z, 
-                              1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z)) * (180 / Math.PI),
-                z: 0
+            model.setAttribute('position', {
+                x: transform.position.x,
+                y: transform.position.y,
+                z: transform.position.z
             });
         }
 
-        // Configurar listeners de eventos
+        // Manejar clic para colocar modelo
         function setupEventListeners() {
-            // Colocar modelo al tocar
-            sceneElement.addEventListener('click', () => {
-                if (!modelPlaced && modelElement.getAttribute('visible') === 'false') {
-                    modelElement.setAttribute('visible', 'true');
-                    modelElement.setAttribute('animation', {
+            scene.addEventListener('click', () => {
+                if (!modelPlaced && model.getAttribute('visible') === 'false') {
+                    model.setAttribute('visible', 'true');
+                    model.setAttribute('animation', {
                         property: 'scale',
                         from: '0.01 0.01 0.01',
                         to: '0.15 0.15 0.15',
@@ -177,40 +267,66 @@
                         easing: 'easeOutElastic'
                     });
                     modelPlaced = true;
-                    overlayElement.style.display = 'none';
+                    overlay.style.display = 'none';
                 }
             });
 
-            // Manejar fin de sesión
-            xrSession.addEventListener('end', () => {
-                cancelAnimationFrame(animationFrameId);
-                resetARState();
-            });
+            xrSession.addEventListener('end', resetAR);
         }
 
         // Resetear estado AR
-        function resetARState() {
-            modelElement.setAttribute('visible', 'false');
-            modelElement.removeAttribute('animation');
+        function resetAR() {
+            model.setAttribute('visible', 'false');
+            model.removeAttribute('animation');
             modelPlaced = false;
-            overlayElement.style.display = 'block';
-            overlayElement.textContent = "Sesión AR terminada. Recarga para reiniciar.";
+            overlay.style.display = 'block';
+            overlay.textContent = "Sesión AR terminada. Recarga para reiniciar.";
         }
 
-        // Mostrar errores
-        function showError(message) {
-            loadingElement.style.display = 'none';
-            overlayElement.textContent = message;
-            overlayElement.style.backgroundColor = 'rgba(200,0,0,0.7)';
-        }
+        // Inicialización principal
+        async function initializeAR() {
+            try {
+                // Mostrar preloader
+                preloader.style.display = 'flex';
+                preloader.style.opacity = '1';
+                document.getElementById('loader').style.display = 'block';
+                
+                // Resetear estado si es un reintento
+                if (retryCount > 0) {
+                    updateLoaderText(`Reintentando (${retryCount}/${MAX_RETRIES})...`);
+                }
 
-        // Inicialización
-        (async function init() {
-            const supported = await checkXRSupport();
-            if (supported) {
+                // 1. Verificar soporte
+                const supported = await checkXRSupport();
+                if (!supported) {
+                    throw new Error("AR no está disponible en tu dispositivo.");
+                }
+
+                // 2. Precargar assets
+                await preloadAssets();
+
+                // 3. Iniciar sesión AR
                 await startXRSession();
+
+                // 4. Configurar eventos
+                setupEventListeners();
+
+            } catch (error) {
+                if (retryCount < MAX_RETRIES) {
+                    retryCount++;
+                    console.warn(`Reintentando (${retryCount}/${MAX_RETRIES})...`);
+                    setTimeout(initializeAR, 2000 * retryCount); // Backoff exponencial
+                } else {
+                    showError(error.message);
+                }
             }
-        })();
+        }
+
+        // Iniciar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => {
+            // Esperar un momento para asegurar que todo está listo
+            setTimeout(initializeAR, 100);
+        });
     </script>
 </body>
 </html>
