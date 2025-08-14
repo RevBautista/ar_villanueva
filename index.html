@@ -2,256 +2,48 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8" />
-    <title>AR con click para colocar modelo</title>
+    <title>AR con QR específico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0" />
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
     <style>
         body {
             margin: 0;
-            padding: 0;
             overflow: hidden;
-            font-family: Arial, sans-serif;
+            background-color: black;
         }
         .a-enter-vr {
             display: none !important;
         }
         a-scene {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        #instructions {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            color: white;
-            background-color: rgba(0,0,0,0.7);
-            padding: 10px 20px;
-            border-radius: 20px;
-            z-index: 1000;
-            max-width: 90%;
-            box-sizing: border-box;
-        }
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            background-color: rgba(0,0,0,0.7);
-            padding: 20px;
-            border-radius: 10px;
-            z-index: 1001;
-            text-align: center;
-        }
-        .progress-bar {
-            width: 200px;
-            height: 20px;
-            background-color: #333;
-            margin: 10px auto;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .progress {
-            height: 100%;
-            background-color: #4CAF50;
-            width: 0%;
-            transition: width 0.3s;
+            width: 100vw;
+            height: 100vh;
         }
     </style>
 </head>
 <body>
-    <div id="loading">
-        <h3>Cargando recursos 3D</h3>
-        <div class="progress-bar">
-            <div class="progress" id="progress"></div>
-        </div>
-        <p id="loading-text">Inicializando...</p>
-    </div>
-    
-    <div id="instructions" style="display: none;">Toca la pantalla para colocar el modelo 3D</div>
-    
     <a-scene
         embedded
-        arjs="sourceType: webcam; 
-              debugUIEnabled: false;
-              detectionMode: mono_and_matrix; 
-              matrixCodeType: 3x3;
-              maxDetectionRate: 30;
-              cameraParametersUrl: https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/data/camera_para.dat"
-        renderer="logarithmicDepthBuffer: true;
-                 precision: medium;
-                 antialias: true;
-                 alpha: true"
-        vr-mode-ui="enabled: false">
+        arjs="sourceType: webcam; debugUIEnabled: false;"
+        vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true; antialias: true">
         
-        <!-- Carga del modelo -->
-        <a-assets timeout="30000">
+        <a-assets>
+            <!-- Tu modelo -->
             <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
         </a-assets>
 
-        <!-- Cámara con controles optimizados para móvil -->
-        <a-entity 
-            camera 
-            id="camera" 
-            position="0 0 0"
-            look-controls="pointerLockEnabled: false; touchEnabled: true"
-            wasd-controls="enabled: false">
-        </a-entity>
+        <!-- Marcador basado en tu QR -->
+        <a-marker type="pattern" url="pattern-Codigo_qr.patt">
+            <a-entity 
+                gltf-model="#modelGLB" 
+                scale="0.5 0.5 0.5"
+                animation="property: scale; from: 0 0 0; to: 0.5 0.5 0.5; dur: 500; easing: easeOutQuad">
+            </a-entity>
+        </a-marker>
+
+        <!-- Cámara -->
+        <a-entity camera></a-entity>
     </a-scene>
-
-    <script>
-        // Mostrar estado de carga
-        const loadingEl = document.getElementById('loading');
-        const progressEl = document.getElementById('progress');
-        const loadingText = document.getElementById('loading-text');
-        const instructionsEl = document.getElementById('instructions');
-        
-        // Eventos de carga de recursos
-        const sceneEl = document.querySelector('a-scene');
-        
-        sceneEl.addEventListener('loaded', function() {
-            loadingText.textContent = "Escena cargada, cargando modelo...";
-            progressEl.style.width = '30%';
-        });
-        
-        sceneEl.addEventListener('asset-loaded', function(e) {
-            if (e.detail.id === 'modelGLB') {
-                loadingText.textContent = "Modelo cargado correctamente!";
-                progressEl.style.width = '100%';
-                
-                // Ocultar loading y mostrar instrucciones después de un breve retraso
-                setTimeout(function() {
-                    loadingEl.style.display = 'none';
-                    instructionsEl.style.display = 'block';
-                    
-                    // Ocultar instrucciones después de 5 segundos
-                    setTimeout(function() {
-                        instructionsEl.style.display = 'none';
-                    }, 5000);
-                }, 1000);
-            }
-        });
-        
-        sceneEl.addEventListener('asset-error', function(e) {
-            console.error("Error cargando asset:", e.detail);
-            loadingText.textContent = "Error cargando el modelo: " + (e.detail.message || "Error desconocido");
-            progressEl.style.backgroundColor = "#f44336";
-            
-            // Mostrar opción para recargar
-            const reloadBtn = document.createElement('button');
-            reloadBtn.textContent = "Reintentar";
-            reloadBtn.style.marginTop = "10px";
-            reloadBtn.style.padding = "8px 16px";
-            reloadBtn.style.backgroundColor = "#4CAF50";
-            reloadBtn.style.color = "white";
-            reloadBtn.style.border = "none";
-            reloadBtn.style.borderRadius = "4px";
-            reloadBtn.style.cursor = "pointer";
-            reloadBtn.addEventListener('click', function() {
-                window.location.reload();
-            });
-            
-            loadingEl.appendChild(reloadBtn);
-        });
-
-        // Cuando haces click en la pantalla
-        document.body.addEventListener('click', function(evt) {
-            // Solo permitir colocar modelo cuando esté completamente cargado
-            if (loadingEl.style.display !== 'none') return;
-            
-            // Evitar múltiples toques rápidos
-            if (Date.now() - (window.lastModelPlacement || 0) < 500) return;
-            window.lastModelPlacement = Date.now();
-            
-            const camera = document.querySelector('[camera]');
-            
-            // Eliminar modelos anteriores si es necesario
-            const oldModels = document.querySelectorAll('[gltf-model]');
-            oldModels.forEach(model => sceneEl.removeChild(model));
-            
-            // Obtener posición y rotación de la cámara
-            const camPos = camera.getAttribute('position') || {x: 0, y: 0, z: 0};
-            const camRot = camera.getAttribute('rotation') || {x: 0, y: 0, z: 0};
-            
-            // Crear entidad del modelo
-            const entity = document.createElement('a-entity');
-            entity.setAttribute('gltf-model', '#modelGLB');
-            
-            // Ajustar escala según dispositivo
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const scale = isMobile ? '0.5 0.5 0.5' : '0.8 0.8 0.8';
-            entity.setAttribute('scale', scale);
-            
-            // Calcular posición frente a la cámara
-            const angle = (camRot.y || 0) * (Math.PI / 180);
-            const distance = isMobile ? 1.5 : 2.0;
-            const x = (camPos.x || 0) - Math.sin(angle) * distance;
-            const z = (camPos.z || 0) - Math.cos(angle) * distance;
-            
-            // Ajustar altura según dispositivo
-            const yOffset = isMobile ? -0.5 : -0.8;
-            
-            entity.setAttribute('position', { 
-                x: x, 
-                y: (camPos.y || 0) + yOffset, 
-                z: z 
-            });
-            
-            // Rotar el modelo para que mire hacia la cámara
-            entity.setAttribute('rotation', {
-                x: 0,
-                y: (camRot.y || 0) + (isMobile ? 180 : 0),
-                z: 0
-            });
-            
-            // Añadir animación para suavizar la aparición
-            entity.setAttribute('animation', {
-                property: 'scale',
-                from: '0.1 0.1 0.1',
-                to: scale,
-                dur: 500
-            });
-            
-            // Añadir sombra para mejor visualización
-            entity.setAttribute('shadow', {
-                receive: false,
-                cast: true
-            });
-            
-            sceneEl.appendChild(entity);
-            
-            // Mostrar feedback visual
-            showPlacementFeedback(x, (camPos.y || 0) + yOffset, z);
-        });
-
-        // Mostrar feedback cuando se coloca el modelo
-        function showPlacementFeedback(x, y, z) {
-            const feedback = document.createElement('a-entity');
-            feedback.setAttribute('position', {x: x, y: y, z: z});
-            feedback.setAttribute('geometry', 'primitive: ring; radiusInner: 0.1; radiusOuter: 0.2');
-            feedback.setAttribute('material', 'color: #4CC3D9; shader: flat');
-            feedback.setAttribute('animation', {
-                property: 'scale',
-                from: '1 1 1',
-                to: '0 0 0',
-                dur: 500,
-                easing: 'easeOutQuad'
-            });
-            
-            // Auto-eliminarse después de la animación
-            feedback.addEventListener('animationcomplete', function() {
-                document.querySelector('a-scene').removeChild(feedback);
-            });
-            
-            document.querySelector('a-scene').appendChild(feedback);
-        }
-    </script>
 </body>
 </html>
