@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindAR Experience</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
+</head>
+
+<body>
+    <a-scene mindar-image="imageTargetSrc: https://cdn.glitch.global/7bdf723b-e2e3-476f-9acb-a4034431caa8/targets.mind?v=1645055213049;"
+              vr-mode-ui="enabled: false"
+              device-orientation-permission-ui="enabled: false">
+
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+        
+        <a-entity mindar-image-target="targetIndex: 0">
+            <a-gltf-model
+                position="0 0 0.1"
+                scale="0.5 0.5 0.5"
+                src="https://cdn.glitch.global/7bdf723b-e2e3-476f-9acb-a4034431caa8/Astromaut.glb?v=1645055810447">
+            </a-gltf-model>
+        </a-entity>
+    </a-scene>
+</body>
+</html>
