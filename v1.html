@@ -8,7 +8,6 @@
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    /* Tema oscuro */
     body, html {
       margin: 0;
       padding: 0;
@@ -16,18 +15,18 @@
       height: 100%;
       overflow: hidden;
       font-family: 'Arial', sans-serif;
-      background-color: #121212;
+      background: transparent; /* transparente para ver la cámara */
       color: #ffffff;
     }
 
-    /* Barra superior */
+    /* Barra superior fija */
     .top-bar {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 50px;
-      background-color: #1f1f1f;
+      background-color: rgba(31,31,31,0.8); /* ligeramente transparente */
       display: flex;
       align-items: center;
       justify-content: center;
@@ -37,12 +36,11 @@
       box-shadow: 0 2px 5px rgba(0,0,0,0.5);
     }
 
-    /* Ajuste de la escena AR para que no quede debajo de la barra */
+    /* Escena AR ocupa toda la pantalla */
     a-scene {
       width: 100%;
       height: 100%;
       display: block;
-      margin-top: 50px; /* espacio para la barra */
     }
   </style>
 </head>
@@ -53,7 +51,9 @@
       mindar-image="imageTargetSrc: targets.mind;"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
-      renderer="colorManagement: true; foveationLevel: 2">
+      renderer="colorManagement: true; foveationLevel: 2"
+      embedded
+      background="color: transparent">
     
     <a-camera position="0 0 0"></a-camera>
     
