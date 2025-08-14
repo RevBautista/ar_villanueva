@@ -2,211 +2,188 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Prueba AR Móvil</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
+    <title>Prueba AR - Diagnóstico</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
     <style>
-        * {
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
         body {
             margin: 0;
-            padding: 0;
             overflow: hidden;
             background-color: #000;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            touch-action: none;
-            position: fixed;
-            width: 100%;
-            height: 100%;
+            font-family: Arial, sans-serif;
         }
         #status {
             position: absolute;
-            top: env(safe-area-inset-top, 20px);
-            left: 0;
-            right: 0;
-            text-align: center;
-            padding: 12px;
-            background-color: rgba(0,0,0,0.7);
-            color: white;
-            font-size: 16px;
-            z-index: 1000;
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        #loading-message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            text-align: center;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            padding: 10px;
             background-color: rgba(0,0,0,0.8);
-            padding: 20px;
-            border-radius: 16px;
-            max-width: 85%;
-            width: 300px;
-            box-sizing: border-box;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        #loading-message h2 {
-            margin-top: 0;
-            font-size: 18px;
-        }
-        #loading-message p {
+            color: white;
+            border-radius: 5px;
+            z-index: 1000;
             font-size: 14px;
-            line-height: 1.5;
         }
-        .mindar-ui-overlay { display: none !important; }
-        .a-enter-vr { display: none !important; }
-        /* Optimización para iOS */
-        a-scene {
-            display: block;
-            width: 100%;
-            height: 100%;
+        #debug {
             position: absolute;
-            top: 0;
-            left: 0;
-            overflow: hidden;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            padding: 10px;
+            background-color: rgba(0,0,0,0.7);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 1000;
+            max-height: 30%;
+            overflow: auto;
+        }
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div id="status">Inicializando AR...</div>
-    <div id="loading-message">
-        <h2>Realidad Aumentada</h2>
-        <p>Apunte su cámara al marcador con buena iluminación</p>
-        <div id="permission-msg" style="color: #ff9; margin-top: 15px; display: none;">
-            Por favor permite acceso a la cámara
-        </div>
-    </div>
+    <div id="status">🔄 Inicializando AR...</div>
+    <div id="debug">Consola de diagnóstico:</div>
 
     <a-scene 
-        mindar-image="imageTargetSrc: target.mind; uiLoading: no; uiScanning: no; uiError: no; maxTrack: 1;"
+        mindar-image="imageTargetSrc: target.mind; uiLoading: no; uiScanning: no; uiError: no;"
         vr-mode-ui="enabled: false"
-        loading-screen="enabled: false"
-        renderer="antialias: true; alpha: true; logarithmicDepthBuffer: true; precision: mediump;">
-        
-        <a-entity camera="fov: 60; near: 0.01; far: 100;"></a-entity>
+        loading-screen="enabled: false">
 
-        <!-- Marcador principal -->
+        <a-entity camera></a-entity>
+
+        <!-- Marcador de prueba -->
         <a-entity mindar-image-target="targetIndex: 0">
-            <a-box color="#E91E63" 
-                  scale="0.15 0.15 0.15" 
-                  position="0 0 0"
-                  animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
-            </a-box>
-            <a-text value="¡Funciona!" 
-                   color="white" 
-                   align="center" 
-                   position="0 -0.25 0"
-                   scale="0.3 0.3 0.3"
-                   width="4">
-            </a-text>
+            <a-box color="red" scale="0.2 0.2 0.2"></a-box>
         </a-entity>
-        
-        <!-- Luz ambiental para mejor visualización -->
-        <a-entity light="type: ambient; color: #FFF; intensity: 0.7"></a-entity>
-        <a-entity light="type: directional; color: #FFF; intensity: 0.3; position: 0 1 1"></a-entity>
     </a-scene>
 
     <script>
         const sceneEl = document.querySelector('a-scene');
-        const statusMsg = document.getElementById('status');
-        const loadingMsg = document.getElementById('loading-message');
-        const permissionMsg = document.getElementById('permission-msg');
-        let trackingStarted = false;
-
-        // Detectar dispositivo y navegador
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        const isAndroid = /Android/.test(navigator.userAgent);
+        const statusEl = document.getElementById('status');
+        const debugEl = document.getElementById('debug');
         
-        // Ajustar mensajes según plataforma
-        if(isIOS) {
-            loadingMsg.innerHTML = `<h2>Realidad Aumentada</h2>
-                                  <p>En iOS:</p>
-                                  <p>1. Usa Safari</p>
-                                  <p>2. Permite acceso a la cámara</p>
-                                  <p>3. Enfoca bien el marcador</p>`;
+        // Variables de diagnóstico
+        let loadStartTime = Date.now();
+        let mindarReady = false;
+        let cameraAllowed = false;
+
+        // Función para agregar mensajes de diagnóstico
+        function logDebug(message) {
+            const now = ((Date.now() - loadStartTime) / 1000).toFixed(2);
+            debugEl.innerHTML += `[${now}s] ${message}<br>`;
+            debugEl.scrollTop = debugEl.scrollHeight;
         }
 
-        // Manejo de permisos
-        const checkPermissions = () => {
-            navigator.permissions && navigator.permissions.query({name: 'camera'})
-                .then(permissionStatus => {
-                    if(permissionStatus.state === 'denied') {
-                        permissionMsg.style.display = 'block';
-                    }
-                    permissionStatus.onchange = () => {
-                        permissionMsg.style.display = permissionStatus.state === 'denied' ? 'block' : 'none';
-                    };
-                });
-        };
-
-        // Eventos de MindAR
-        sceneEl.addEventListener('mindar-image-ready', (e) => {
-            statusMsg.textContent = "Busca el marcador...";
-            loadingMsg.querySelector('h2').textContent = "¡Listo!";
-            loadingMsg.querySelector('p').textContent = "Mueve la cámara lentamente sobre el marcador";
+        // Verificar compatibilidad
+        function checkCompatibility() {
+            const compatible = !!window.WebGLRenderingContext && 
+                              !!document.createElement('canvas').getContext('webgl') &&
+                              navigator.mediaDevices &&
+                              navigator.mediaDevices.getUserMedia;
             
-            // Forzar redimensionamiento para iOS
-            setTimeout(() => {
-                window.dispatchEvent(new Event('resize'));
-            }, 500);
-            
-            checkPermissions();
-        });
-
-        sceneEl.addEventListener('targetFound', (e) => {
-            statusMsg.textContent = "✅ Marcador detectado";
-            statusMsg.style.backgroundColor = "rgba(40,167,69,0.8)";
-            trackingStarted = true;
-        });
-
-        sceneEl.addEventListener('targetLost', (e) => {
-            statusMsg.textContent = trackingStarted ? "Mueve la cámara para reencontrar el marcador" : "Busca el marcador...";
-            statusMsg.style.backgroundColor = "rgba(0,0,0,0.8)";
-        });
-
-        sceneEl.addEventListener('mindar-image-error', (e) => {
-            console.error("Error MindAR:", e.detail);
-            
-            let errorMsg = "Error técnico";
-            if(e.detail.message.includes("NotAllowedError")) {
-                errorMsg = "Permiso de cámara denegado";
-                permissionMsg.style.display = 'block';
-            } else if(e.detail.message.includes("NotFoundError")) {
-                errorMsg = "Cámara no encontrada";
+            if (!compatible) {
+                statusEl.innerHTML = "❌ Dispositivo no compatible<br>" +
+                                   "Necesitas un navegador moderno con WebGL y cámara";
+                logDebug("ERROR: Navegador no compatible con WebGL/WebRTC");
             }
-            
-            statusMsg.textContent = errorMsg;
-            loadingMsg.innerHTML = `<h2>Error</h2>
-                                  <p>${errorMsg}</p>
-                                  <p>Recarga la página e intenta de nuevo</p>`;
-        });
+            return compatible;
+        }
 
-        // Optimización para iOS: prevenir scroll
-        document.addEventListener('touchmove', (e) => {
-            if(e.target.tagName !== 'A-ENTITY') {
-                e.preventDefault();
+        // Verificar permisos de cámara
+        async function checkCameraPermissions() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop());
+                cameraAllowed = true;
+                logDebug("Permisos de cámara: concedidos");
+            } catch (err) {
+                statusEl.innerHTML = "❌ Error de cámara<br>" +
+                                   "Por favor permite acceso a la cámara y recarga";
+                logDebug(`ERROR Cámara: ${err.message}`);
+                return false;
             }
-        }, { passive: false });
+            return true;
+        }
 
-        // Carga progresiva para Android
-        if(isAndroid) {
-            setTimeout(() => {
-                if(!trackingStarted) {
-                    loadingMsg.querySelector('p').innerHTML += "<br><br>En Android puede tardar unos segundos más...";
+        // Verificar carga de target.mind
+        async function checkTargetFile() {
+            try {
+                const response = await fetch('target.mind');
+                if (!response.ok) throw new Error("Archivo no encontrado");
+                
+                const content = await response.blob();
+                logDebug(`target.mind cargado (${(content.size/1024).toFixed(1)}KB)`);
+                return true;
+            } catch (err) {
+                statusEl.innerHTML = "❌ Error en target.mind<br>" +
+                                   "Asegúrate de que el archivo existe";
+                logDebug(`ERROR target.mind: ${err.message}`);
+                return false;
+            }
+        }
+
+        // Inicialización completa
+        async function initializeAR() {
+            if (!checkCompatibility()) return;
+            
+            logDebug("Iniciando diagnóstico...");
+            
+            // Verificar permisos y archivo en paralelo
+            const [permissionsOk, targetOk] = await Promise.all([
+                checkCameraPermissions(),
+                checkTargetFile()
+            ]);
+            
+            if (!permissionsOk || !targetOk) return;
+            
+            logDebug("Sistema compatible - Esperando MindAR...");
+            
+            // Configurar eventos de MindAR
+            sceneEl.addEventListener('mindar-image-ready', (e) => {
+                mindarReady = true;
+                statusEl.innerHTML = "✅ AR Listo<br>Busca el marcador";
+                logDebug("MindAR inicializado correctamente");
+                
+                // Mostrar información de los targets
+                const mindarSystem = sceneEl.systems["mindar-image-system"];
+                if (mindarSystem && mindarSystem.imageTargets) {
+                    logDebug(`Targets cargados: ${mindarSystem.imageTargets.length}`);
                 }
-            }, 3000);
+            });
+            
+            sceneEl.addEventListener('targetFound', (e) => {
+                statusEl.innerHTML = "🎯 Marcador detectado!";
+                logDebug(`Target encontrado: ${e.detail.targetIndex}`);
+            });
+            
+            sceneEl.addEventListener('targetLost', (e) => {
+                statusEl.innerHTML = "🔍 Buscando marcador...";
+            });
+            
+            sceneEl.addEventListener('mindar-image-error', (e) => {
+                statusEl.innerHTML = "⚠️ Error en AR";
+                logDebug(`ERROR MindAR: ${e.detail.message}`);
+            });
+            
+            // Timeout por si falla la inicialización
+            setTimeout(() => {
+                if (!mindarReady) {
+                    statusEl.innerHTML = "⚠️ AR no responde<br>" +
+                                      "Intenta recargar la página";
+                    logDebug("ERROR: Timeout de inicialización");
+                }
+            }, 15000);
+        }
+
+        // Iniciar todo cuando el DOM esté listo
+        if (document.readyState === 'complete') {
+            initializeAR();
+        } else {
+            window.addEventListener('load', initializeAR);
         }
     </script>
 </body>
