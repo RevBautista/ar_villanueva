@@ -5,7 +5,7 @@
     <title>AR con QR específico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0" />
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -24,21 +24,25 @@
 <body>
     <a-scene
         embedded
-        arjs="sourceType: webcam; debugUIEnabled: false;"
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
         vr-mode-ui="enabled: false"
         renderer="logarithmicDepthBuffer: true; antialias: true">
         
         <a-assets>
-            <!-- Tu modelo -->
+            <!-- Modelo 3D - asegúrate de que la ruta sea correcta -->
             <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
         </a-assets>
 
-        <!-- Marcador basado en tu QR -->
-        <a-marker type="pattern" url="pattern-Codigo_qr.patt">
+        <!-- Marcador QR -->
+        <a-marker 
+            type="pattern" 
+            preset="custom"
+            url="pattern-Codigo_qr.patt">
             <a-entity 
                 gltf-model="#modelGLB" 
                 scale="0.5 0.5 0.5"
-                animation="property: scale; from: 0 0 0; to: 0.5 0.5 0.5; dur: 500; easing: easeOutQuad">
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 10000;"
+                animation__scale="property: scale; from: 0.1 0.1 0.1; to: 0.5 0.5 0.5; dur: 500; easing: easeOutQuad">
             </a-entity>
         </a-marker>
 
