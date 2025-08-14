@@ -1,93 +1,26 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lector de target.mind</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        .container {
-            border: 1px solid #ddd;
-            padding: 20px;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-        }
-        .success {
-            color: green;
-            font-weight: bold;
-        }
-        .error {
-            color: red;
-            font-weight: bold;
-        }
-        button {
-            padding: 10px 15px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-    </style>
+    <meta charset="utf-8">
+    <title>MindAR Prototipo</title>
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>Lector de archivo target.mind</h1>
-        <p>Este código intentará leer el archivo target.mind</p>
-        
-        <input type="file" id="fileInput" accept=".mind" style="display: none;">
-        <button onclick="document.getElementById('fileInput').click()">Seleccionar archivo target.mind</button>
-        
-        <div id="result">
-            <p>Presiona el botón para seleccionar el archivo.</p>
-        </div>
-    </div>
+    <a-scene mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/examples/image-tracking/assets/card-example/card.mind;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+        <a-assets>
+            <img id="card" src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/examples/image-tracking/assets/card-example/card.png">
+            <a-asset-item id="avatarModel" src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/examples/image-tracking/assets/card-example/softmind/scene.gltf"></a-asset-item>
+        </a-assets>
 
-    <script>
-        const fileInput = document.getElementById('fileInput');
-        const resultDiv = document.getElementById('result');
-        
-        fileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            
-            if (!file) {
-                resultDiv.innerHTML = '<p class="error">No se seleccionó ningún archivo.</p>';
-                return;
-            }
-            
-            if (file.name !== 'target.mind') {
-                resultDiv.innerHTML = `<p class="error">El archivo seleccionado no se llama target.mind (seleccionaste: ${file.name})</p>`;
-                return;
-            }
-            
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                const content = e.target.result;
-                resultDiv.innerHTML = `
-                    <p class="success">¡Archivo target.mind leído con éxito!</p>
-                    <p>Tamaño del archivo: ${file.size} bytes</p>
-                    <h3>Contenido (primeras 200 caracteres):</h3>
-                    <pre>${content.substring(0, 200)}</pre>
-                `;
-            };
-            
-            reader.onerror = function() {
-                resultDiv.innerHTML = '<p class="error">Error al leer el archivo target.mind</p>';
-            };
-            
-            reader.readAsText(file);
-        });
-    </script>
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+        <a-entity mindar-image-target="targetIndex: 0">
+            <a-plane src="#card" position="0 0 0" height="0.552" width="1" rotation="0 0 0"></a-plane>
+            <a-gltf-model rotation="0 0 0 " position="0 0 0.1" scale="0.005 0.005 0.005" src="#avatarModel"
+                animation="property: position; to: 0 0.1 0.1; dur: 1000; easing: easeInOutQuad; loop: true; dir: alternate">
+            </a-gltf-model>
+        </a-entity>
+    </a-scene>
 </body>
 </html>
