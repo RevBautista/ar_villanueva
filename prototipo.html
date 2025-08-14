@@ -2,92 +2,91 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>AR Fixed Version</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Usamos versiones específicas compatibles -->
-    <script src="https://cdn.jsdelivr.net/npm/aframe@1.3.0/dist/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-aframe.prod.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lector de target.mind</title>
     <style>
         body {
-            margin: 0;
-            overflow: hidden;
-            background-color: black;
-        }
-        #status {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background-color: rgba(0,0,0,0.5);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 1000;
             font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
 <body>
-    <div id="status">Inicializando AR...</div>
-
-    <a-scene 
-        mindar-image="imageTargetSrc: target.mind; uiLoading: no; uiScanning: no; uiError: no;"
-        vr-mode-ui="enabled: false"
-        renderer="logarithmicDepthBuffer: true; antialias: true; precision: mediump;"
-        loading-screen="enabled: false">
-
-        <a-assets>
-            <!-- Modelo simple para prueba -->
-            <a-asset-item id="boxModel" src=""></a-asset-item>
-        </a-assets>
-
-        <a-entity camera></a-entity>
-
-        <!-- Marcador -->
-        <a-entity mindar-image-target="targetIndex: 0">
-            <a-box color="red" scale="0.2 0.2 0.2"></a-box>
-        </a-entity>
-    </a-scene>
+    <div class="container">
+        <h1>Lector de archivo target.mind</h1>
+        <p>Este código intentará leer el archivo target.mind</p>
+        
+        <input type="file" id="fileInput" accept=".mind" style="display: none;">
+        <button onclick="document.getElementById('fileInput').click()">Seleccionar archivo target.mind</button>
+        
+        <div id="result">
+            <p>Presiona el botón para seleccionar el archivo.</p>
+        </div>
+    </div>
 
     <script>
-        // Solución para el error getObject30
-        AFRAME.registerComponent('fix-mindar-error', {
-            init: function() {
-                this.el.sceneEl.addEventListener('loaded', () => {
-                    const mindarSystem = this.el.sceneEl.systems['mindar-image-system'];
-                    if (mindarSystem) {
-                        const originalInit = mindarSystem.init;
-                        mindarSystem.init = function() {
-                            originalInit.call(this);
-                            if (!this.threeRenderer) {
-                                this.threeRenderer = this.renderer;
-                            }
-                        };
-                    }
-                });
+        const fileInput = document.getElementById('fileInput');
+        const resultDiv = document.getElementById('result');
+        
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            
+            if (!file) {
+                resultDiv.innerHTML = '<p class="error">No se seleccionó ningún archivo.</p>';
+                return;
             }
-        });
-
-        document.querySelector('a-scene').setAttribute('fix-mindar-error', '');
-
-        // Manejo de estado
-        const sceneEl = document.querySelector('a-scene');
-        const statusEl = document.getElementById('status');
-
-        sceneEl.addEventListener('mindar-image-ready', () => {
-            statusEl.textContent = "Sistema listo - Busca el marcador";
-        });
-
-        sceneEl.addEventListener('targetFound', () => {
-            statusEl.textContent = "✅ Marcador detectado!";
-        });
-
-        sceneEl.addEventListener('targetLost', () => {
-            statusEl.textContent = "Buscando marcador...";
-        });
-
-        sceneEl.addEventListener('mindar-image-error', (e) => {
-            console.error("Error MindAR:", e.detail);
-            statusEl.textContent = `Error: ${e.detail.message}`;
+            
+            if (file.name !== 'target.mind') {
+                resultDiv.innerHTML = `<p class="error">El archivo seleccionado no se llama target.mind (seleccionaste: ${file.name})</p>`;
+                return;
+            }
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const content = e.target.result;
+                resultDiv.innerHTML = `
+                    <p class="success">¡Archivo target.mind leído con éxito!</p>
+                    <p>Tamaño del archivo: ${file.size} bytes</p>
+                    <h3>Contenido (primeras 200 caracteres):</h3>
+                    <pre>${content.substring(0, 200)}</pre>
+                `;
+            };
+            
+            reader.onerror = function() {
+                resultDiv.innerHTML = '<p class="error">Error al leer el archivo target.mind</p>';
+            };
+            
+            reader.readAsText(file);
         });
     </script>
 </body>
