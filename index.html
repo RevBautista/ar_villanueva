@@ -1,118 +1,27 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>AR con MindAR</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-            font-family: Arial, sans-serif;
-        }
-        #status {
-            position: absolute;
-            top: 20px;
-            left: 0;
-            right: 0;
-            text-align: center;
-            padding: 10px;
-            background-color: rgba(0,0,0,0.7);
-            color: white;
-            font-size: 18px;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        #loading-message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            text-align: center;
-            background-color: rgba(0,0,0,0.7);
-            padding: 20px;
-            border-radius: 10px;
-            max-width: 80%;
-        }
-        .visible { opacity: 1; }
-        .hidden { display: none; }
-        /* Ocultar completamente la UI de MindAR */
-        .mindar-ui-overlay { display: none !important; }
-        .a-enter-vr { display: none !important; }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image.prod.js"></script>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
 </head>
 <body>
-    <div id="status"></div>
-    <div id="loading-message">Buscando marcador...<br>Enfoca bien la cámara hacia el marcador</div>
-
-    <a-scene 
-        mindar-image="imageTargetSrc: target.mind; uiLoading: no; uiScanning: no; uiError: no;"
-        color-space="sRGB"
-        renderer="colorManagement: true; physicallyCorrectLights: true;"
+    <a-scene
+        mindar-image="imageTargetSrc: targets.mind;"
         vr-mode-ui="enabled: false"
-        loading-screen="enabled: false">
+        device-orientation-permission-ui="enabled: false">
         
-        <a-assets>
-            <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
-        </a-assets>
-
-        <a-entity camera></a-entity>
-
-        <!-- Marcador - Asegúrate que targetIndex coincida con tu target.mind -->
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+        
         <a-entity mindar-image-target="targetIndex: 0">
-            <a-entity 
-                id="modelEntity"
-                gltf-model="#modelGLB"
-                scale="0.01 0.01 0.01"
-                animation__scale="property: scale; to: 0.5 0.5 0.5; dur: 800; startEvents: targetFound; easing: easeOutElastic"
-                animation__hide="property: scale; to: 0.01 0.01 0.01; dur: 300; startEvents: targetLost">
-            </a-entity>
+            <a-gltf-model
+                rotation="-90 180 0"
+                position="0 0 0.1"
+                scale="0.5 0.5 0.5"
+                src="model.glb">
+            </a-gltf-model>
         </a-entity>
+        
     </a-scene>
-
-    <script>
-        const sceneEl = document.querySelector('a-scene');
-        const statusMsg = document.getElementById('status');
-        const loadingMsg = document.getElementById('loading-message');
-        let timeoutId;
-
-        // Cuando MindAR esté listo
-        sceneEl.addEventListener('mindar-image-ready', (e) => {
-            console.log('MindAR está listo');
-            timeoutId = setTimeout(() => {
-                loadingMsg.innerHTML = "¿No detecta el marcador?<br>1. Asegure buena iluminación<br>2. Enfoque correctamente<br>3. Pruebe acercar/alejar";
-            }, 8000);
-        });
-
-        // Cuando se detecte el marcador
-        sceneEl.addEventListener('targetFound', (e) => {
-            statusMsg.textContent = '✅ Marcador detectado';
-            statusMsg.classList.add('visible');
-            loadingMsg.classList.add('hidden');
-            clearTimeout(timeoutId);
-        });
-
-        // Cuando se pierda el marcador
-        sceneEl.addEventListener('targetLost', (e) => {
-            statusMsg.textContent = '❌ Buscando marcador...';
-            statusMsg.classList.add('visible');
-            loadingMsg.classList.remove('hidden');
-            
-            setTimeout(() => {
-                statusMsg.classList.remove('visible');
-            }, 2000);
-        });
-
-        // Manejo de errores
-        sceneEl.addEventListener('mindar-image-error', (e) => {
-            console.error('Error en MindAR:', e.detail);
-            loadingMsg.innerHTML = "Error al cargar AR<br>Recargue la página o pruebe otra cámara";
-        });
-    </script>
 </body>
 </html>
