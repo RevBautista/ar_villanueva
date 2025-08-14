@@ -2,189 +2,93 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Prueba AR - Diagnóstico</title>
+    <title>AR Fixed Version</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
+    <!-- Usamos versiones específicas compatibles -->
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.3.0/dist/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-aframe.prod.js"></script>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #000;
-            font-family: Arial, sans-serif;
+            background-color: black;
         }
         #status {
             position: absolute;
             top: 10px;
             left: 10px;
-            right: 10px;
-            padding: 10px;
-            background-color: rgba(0,0,0,0.8);
+            background-color: rgba(0,0,0,0.5);
             color: white;
+            padding: 10px;
             border-radius: 5px;
             z-index: 1000;
-            font-size: 14px;
-        }
-        #debug {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            right: 10px;
-            padding: 10px;
-            background-color: rgba(0,0,0,0.7);
-            color: #0f0;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 1000;
-            max-height: 30%;
-            overflow: auto;
-        }
-        .hidden {
-            display: none;
+            font-family: Arial, sans-serif;
         }
     </style>
 </head>
 <body>
-    <div id="status">🔄 Inicializando AR...</div>
-    <div id="debug">Consola de diagnóstico:</div>
+    <div id="status">Inicializando AR...</div>
 
     <a-scene 
         mindar-image="imageTargetSrc: target.mind; uiLoading: no; uiScanning: no; uiError: no;"
         vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true; antialias: true; precision: mediump;"
         loading-screen="enabled: false">
+
+        <a-assets>
+            <!-- Modelo simple para prueba -->
+            <a-asset-item id="boxModel" src=""></a-asset-item>
+        </a-assets>
 
         <a-entity camera></a-entity>
 
-        <!-- Marcador de prueba -->
+        <!-- Marcador -->
         <a-entity mindar-image-target="targetIndex: 0">
             <a-box color="red" scale="0.2 0.2 0.2"></a-box>
         </a-entity>
     </a-scene>
 
     <script>
+        // Solución para el error getObject30
+        AFRAME.registerComponent('fix-mindar-error', {
+            init: function() {
+                this.el.sceneEl.addEventListener('loaded', () => {
+                    const mindarSystem = this.el.sceneEl.systems['mindar-image-system'];
+                    if (mindarSystem) {
+                        const originalInit = mindarSystem.init;
+                        mindarSystem.init = function() {
+                            originalInit.call(this);
+                            if (!this.threeRenderer) {
+                                this.threeRenderer = this.renderer;
+                            }
+                        };
+                    }
+                });
+            }
+        });
+
+        document.querySelector('a-scene').setAttribute('fix-mindar-error', '');
+
+        // Manejo de estado
         const sceneEl = document.querySelector('a-scene');
         const statusEl = document.getElementById('status');
-        const debugEl = document.getElementById('debug');
-        
-        // Variables de diagnóstico
-        let loadStartTime = Date.now();
-        let mindarReady = false;
-        let cameraAllowed = false;
 
-        // Función para agregar mensajes de diagnóstico
-        function logDebug(message) {
-            const now = ((Date.now() - loadStartTime) / 1000).toFixed(2);
-            debugEl.innerHTML += `[${now}s] ${message}<br>`;
-            debugEl.scrollTop = debugEl.scrollHeight;
-        }
+        sceneEl.addEventListener('mindar-image-ready', () => {
+            statusEl.textContent = "Sistema listo - Busca el marcador";
+        });
 
-        // Verificar compatibilidad
-        function checkCompatibility() {
-            const compatible = !!window.WebGLRenderingContext && 
-                              !!document.createElement('canvas').getContext('webgl') &&
-                              navigator.mediaDevices &&
-                              navigator.mediaDevices.getUserMedia;
-            
-            if (!compatible) {
-                statusEl.innerHTML = "❌ Dispositivo no compatible<br>" +
-                                   "Necesitas un navegador moderno con WebGL y cámara";
-                logDebug("ERROR: Navegador no compatible con WebGL/WebRTC");
-            }
-            return compatible;
-        }
+        sceneEl.addEventListener('targetFound', () => {
+            statusEl.textContent = "✅ Marcador detectado!";
+        });
 
-        // Verificar permisos de cámara
-        async function checkCameraPermissions() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                stream.getTracks().forEach(track => track.stop());
-                cameraAllowed = true;
-                logDebug("Permisos de cámara: concedidos");
-            } catch (err) {
-                statusEl.innerHTML = "❌ Error de cámara<br>" +
-                                   "Por favor permite acceso a la cámara y recarga";
-                logDebug(`ERROR Cámara: ${err.message}`);
-                return false;
-            }
-            return true;
-        }
+        sceneEl.addEventListener('targetLost', () => {
+            statusEl.textContent = "Buscando marcador...";
+        });
 
-        // Verificar carga de target.mind
-        async function checkTargetFile() {
-            try {
-                const response = await fetch('target.mind');
-                if (!response.ok) throw new Error("Archivo no encontrado");
-                
-                const content = await response.blob();
-                logDebug(`target.mind cargado (${(content.size/1024).toFixed(1)}KB)`);
-                return true;
-            } catch (err) {
-                statusEl.innerHTML = "❌ Error en target.mind<br>" +
-                                   "Asegúrate de que el archivo existe";
-                logDebug(`ERROR target.mind: ${err.message}`);
-                return false;
-            }
-        }
-
-        // Inicialización completa
-        async function initializeAR() {
-            if (!checkCompatibility()) return;
-            
-            logDebug("Iniciando diagnóstico...");
-            
-            // Verificar permisos y archivo en paralelo
-            const [permissionsOk, targetOk] = await Promise.all([
-                checkCameraPermissions(),
-                checkTargetFile()
-            ]);
-            
-            if (!permissionsOk || !targetOk) return;
-            
-            logDebug("Sistema compatible - Esperando MindAR...");
-            
-            // Configurar eventos de MindAR
-            sceneEl.addEventListener('mindar-image-ready', (e) => {
-                mindarReady = true;
-                statusEl.innerHTML = "✅ AR Listo<br>Busca el marcador";
-                logDebug("MindAR inicializado correctamente");
-                
-                // Mostrar información de los targets
-                const mindarSystem = sceneEl.systems["mindar-image-system"];
-                if (mindarSystem && mindarSystem.imageTargets) {
-                    logDebug(`Targets cargados: ${mindarSystem.imageTargets.length}`);
-                }
-            });
-            
-            sceneEl.addEventListener('targetFound', (e) => {
-                statusEl.innerHTML = "🎯 Marcador detectado!";
-                logDebug(`Target encontrado: ${e.detail.targetIndex}`);
-            });
-            
-            sceneEl.addEventListener('targetLost', (e) => {
-                statusEl.innerHTML = "🔍 Buscando marcador...";
-            });
-            
-            sceneEl.addEventListener('mindar-image-error', (e) => {
-                statusEl.innerHTML = "⚠️ Error en AR";
-                logDebug(`ERROR MindAR: ${e.detail.message}`);
-            });
-            
-            // Timeout por si falla la inicialización
-            setTimeout(() => {
-                if (!mindarReady) {
-                    statusEl.innerHTML = "⚠️ AR no responde<br>" +
-                                      "Intenta recargar la página";
-                    logDebug("ERROR: Timeout de inicialización");
-                }
-            }, 15000);
-        }
-
-        // Iniciar todo cuando el DOM esté listo
-        if (document.readyState === 'complete') {
-            initializeAR();
-        } else {
-            window.addEventListener('load', initializeAR);
-        }
+        sceneEl.addEventListener('mindar-image-error', (e) => {
+            console.error("Error MindAR:", e.detail);
+            statusEl.textContent = `Error: ${e.detail.message}`;
+        });
     </script>
 </body>
 </html>
