@@ -34,13 +34,32 @@
         .a-enter-vr {
             display: none !important;
         }
+        /* Estilo para el mensaje de carga */
+        #loading-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            text-align: center;
+            z-index: 999;
+        }
+        /* Ocultar el loader de MindAR después de 10 segundos */
+        .mindar-ui-overlay.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <!-- Mensaje de estado -->
     <div id="status"></div>
+    
+    <!-- Mensaje de carga personalizado -->
+    <div id="loading-message">Buscando marcador...<br>Apunte su cámara al marcador</div>
 
-    <a-scene mindar-image="imageTargetSrc: target.mind;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false">
+    <a-scene mindar-image="imageTargetSrc: target.mind; uiLoading: no; uiScanning: no; uiError: no;" 
+             color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" 
+             vr-mode-ui="enabled: false">
         <a-assets>
             <!-- Tu modelo 3D -->
             <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
@@ -64,15 +83,30 @@
     <script>
         const target = document.querySelector('[mindar-image-target]');
         const statusMsg = document.getElementById('status');
+        const loadingMessage = document.getElementById('loading-message');
+
+        // Ocultar el loader de MindAR después de 10 segundos
+        setTimeout(() => {
+            const mindarUI = document.querySelector('.mindar-ui-overlay');
+            if (mindarUI) mindarUI.classList.add('hidden');
+            loadingMessage.textContent = "¿Problemas para detectar el marcador?\nAsegúrese de que esté bien iluminado";
+        }, 10000);
 
         target.addEventListener('targetFound', () => {
             statusMsg.textContent = '✅ Marcador detectado';
             statusMsg.classList.add('visible');
+            loadingMessage.style.display = 'none';
+            
+            // Ocultar definitivamente el loader de MindAR
+            const mindarUI = document.querySelector('.mindar-ui-overlay');
+            if (mindarUI) mindarUI.classList.add('hidden');
         });
 
         target.addEventListener('targetLost', () => {
             statusMsg.textContent = '❌ Marcador perdido';
             statusMsg.classList.add('visible');
+            loadingMessage.style.display = 'block';
+            
             setTimeout(() => {
                 statusMsg.classList.remove('visible');
             }, 1000);
