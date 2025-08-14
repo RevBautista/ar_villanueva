@@ -1,27 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image.prod.js"></script>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
+  <meta charset="UTF-8">
+  <title>AR Villanueva's</title>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image.prod.js"></script>
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    /* Tema oscuro */
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Arial', sans-serif;
+      background-color: #121212;
+      color: #ffffff;
+    }
+
+    /* Barra superior */
+    .top-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 50px;
+      background-color: #1f1f1f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5em;
+      font-weight: bold;
+      z-index: 10;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    }
+
+    /* Ajuste de la escena AR para que no quede debajo de la barra */
+    a-scene {
+      width: 100%;
+      height: 100%;
+      display: block;
+      margin-top: 50px; /* espacio para la barra */
+    }
+  </style>
 </head>
 <body>
-    <a-scene
-        mindar-image="imageTargetSrc: targets.mind;"
-        vr-mode-ui="enabled: false"
-        device-orientation-permission-ui="enabled: false">
-        
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-        
-        <a-entity mindar-image-target="targetIndex: 0">
-            <a-gltf-model
-                rotation="-90 0 0"
-                position="0 0 0.1"
-                scale="0.5 0.5 0.5"
-                src="model.glb">
-            </a-gltf-model>
-        </a-entity>
-        
-    </a-scene>
+  <div class="top-bar">Villanueva's</div>
+
+  <a-scene
+      mindar-image="imageTargetSrc: targets.mind;"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+      renderer="colorManagement: true; foveationLevel: 2">
+    
+    <a-camera position="0 0 0"></a-camera>
+    
+    <a-entity mindar-image-target="targetIndex: 0">
+      <a-gltf-model
+          rotation="-90 180 0"
+          position="0 0 0.1"
+          scale="0.5 0.5 0.5"
+          src="model.glb">
+      </a-gltf-model>
+    </a-entity>
+
+  </a-scene>
 </body>
 </html>
